@@ -162,6 +162,13 @@
       margin-bottom: 10px;
     }
 
+    .auth-msg:not(:empty) {
+      padding: 10px 12px;
+      background: #fdecea;
+      border: 1px solid #f5c6cb;
+      border-radius: 8px;
+    }
+
     .auth-msg.ok {
       color: var(--primary-dark);
     }
@@ -1763,7 +1770,11 @@
           return;
         }
         if (user && route === "login") {
-          location.hash = "#/home";
+          showView("home");
+          if (location.hash !== "#/home") {
+            location.hash = "#/home";
+          }
+          if (typeof refreshUserUi === "function") refreshUserUi();
           return;
         }
         if (route !== "home") {
@@ -1782,7 +1793,7 @@
         render();
       }
 
-      return { init: init, render: render };
+      return { init: init, render: render, showView: showView };
     })();
 
     /* 先绑定登录与路由，再绑定首页搜索等；避免前面任一步抛错导致「登录按钮永远没监听」 */
@@ -2255,7 +2266,13 @@
             showLoginError(r.msg || "登录失败");
             return;
           }
+          if (typeof AppRouter !== "undefined" && AppRouter.showView) {
+            AppRouter.showView("home");
+          }
           location.hash = "#/home";
+          if (typeof refreshUserUi === "function") {
+            refreshUserUi();
+          }
           if (typeof AppRouter !== "undefined" && AppRouter.render) {
             AppRouter.render();
           }
