@@ -1173,7 +1173,7 @@
 </head>
 <body class="page-load">
   <!-- ========== SPA：登录/注册（Hash #/login）========== -->
-  <div id="spa-login" class="spa-view auth-page is-active">
+  <div id="spa-login" class="spa-view auth-page is-active" data-app-part="auth-login" aria-label="登录与注册">
     <div class="auth-card">
       <h2>让垃圾回家—智能垃圾分类系统</h2>
       <div class="auth-tabs" role="tablist">
@@ -1218,7 +1218,7 @@
   </div>
 
   <!-- ========== SPA：主功能（Hash #/home）========== -->
-  <div id="spa-home" class="spa-view">
+  <div id="spa-home" class="spa-view" data-app-part="main-app" aria-label="垃圾分类主功能">
   <!-- 页头：主副标题 + 国标标签 + 锚点导航（滚动收缩 / 移动端汉堡） -->
   <header class="header" id="pageHeader" role="banner">
     <div class="header-inner">
@@ -1288,12 +1288,12 @@
       </ul>
     </section>
 
-    <!-- 图片识别区（纯前端模式：界面保留，识别需自建后端） -->
+    <!-- 图片识别区（浏览器端轻量模型，部署到 https 后首次识别需联网加载模型） -->
     <section class="image-section" id="section-image">
       <h2>📷 拍照 / 选图识别</h2>
-      <p class="sub">本页为<strong>纯前端单页应用</strong>，不连接任何服务器。以下仅为界面示意；真实 AI 识别需自行部署 Node + Python 等服务。</p>
+      <p class="sub">将本页部署到 <strong>GitHub Pages</strong> 等静态空间即可获得<strong>固定网址</strong>访问；登录与主功能通过路由 <code>#/login</code> / <code>#/home</code> 分为两块。下图识别在浏览器内运行 MobileNet（ImageNet 标签映射到四类垃圾，<strong>仅供参考</strong>）。</p>
       <div class="image-offline-tip">
-        <strong>说明：</strong>当前版本已关闭联网识别。您仍可选图预览；点击「开始识别」将提示此功能需后端支持，不会在本地调用接口。
+        <strong>说明：</strong>首次点击「开始识别」会从 CDN 加载 TensorFlow.js 与模型（需联网）。本地 <code>file://</code> 打开可能受浏览器安全策略限制，建议用上述网址访问。
       </div>
       <div class="image-row">
         <input type="file" id="imageInput" accept="image/*" capture="environment" />
@@ -2070,7 +2070,7 @@
 
     if (batchSearchBtn) batchSearchBtn.addEventListener("click", doBatchSearch);
 
-    /* ========== 图片识别：纯前端降级（不请求 API）========== */
+    /* ========== 图片识别：TensorFlow.js + MobileNet（浏览器端，ImageNet→四类映射）========== */
     var imageObjectUrl = null;
 
     function clearImagePreview() {
@@ -2082,8 +2082,118 @@
       if (imagePreview) imagePreview.removeAttribute("src");
     }
 
+    function gcLoadScriptOnce(src) {
+      return new Promise(function (resolve, reject) {
+        var esc = src.replace(/"/g, "");
+        if (document.querySelector('script[data-gc-tf-src="' + esc + '"]')) {
+          resolve();
+          return;
+        }
+        var s = document.createElement("script");
+        s.src = src;
+        s.async = true;
+        s.setAttribute("data-gc-tf-src", esc);
+        s.onload = function () {
+          resolve();
+        };
+        s.onerror = function () {
+          reject(new Error("无法加载脚本（请检查网络或使用 https 网址打开本页）"));
+        };
+        document.head.appendChild(s);
+      });
+    }
+
+    function gcEnsureMobilenetModel() {
+      if (window.__gcMobilenetModel) return Promise.resolve(window.__gcMobilenetModel);
+      if (window.__gcMobilenetLoading) return window.__gcMobilenetLoading;
+      var tfCdn = "https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js";
+      var mnCdn = "https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.1/dist/mobilenet.js";
+      window.__gcMobilenetLoading = gcLoadScriptOnce(tfCdn)
+        .then(function () {
+          return gcLoadScriptOnce(mnCdn);
+        })
+        .then(function () {
+          var MN = typeof mobilenet !== "undefined" ? mobilenet : window.mobilenet;
+          if (!MN || typeof MN.load !== "function") {
+            throw new Error("MobileNet 库未正确加载");
+          }
+          return MN.load();
+        })
+        .then(function (model) {
+          window.__gcMobilenetModel = model;
+          window.__gcMobilenetLoading = null;
+          return model;
+        })
+        .catch(function (e) {
+          window.__gcMobilenetLoading = null;
+          throw e;
+        });
+      return window.__gcMobilenetLoading;
+    }
+
+    function gcMapImageNetToGarbage(predictions) {
+      var scores = { recyclable: 0, kitchen: 0, hazardous: 0, other: 0 };
+      var groups = {
+        recyclable: [
+          "bottle", "plastic", "carton", "can", "metal", "glass", "container", "paper", "box", "book",
+          "cardboard", "aluminum", "tin", "jar", "cup", "packet", "beer", "wine", "pop", "soda", "bucket"
+        ],
+        kitchen: [
+          "banana", "apple", "orange", "lemon", "food", "cheese", "broccoli", "carrot", "pizza", "hot dog",
+          "strawberry", "vegetable", "fruit", "meat", "pineapple", "cucumber", "bagel", "pretzel", "corn", "fig",
+          "dough", "meat ball", "potpie", "espresso", "coffee", "egg", "mashed", "soup", "ice cream", "burrito"
+        ],
+        hazardous: ["medicine", "pill", "syringe", "lighter", "perfume", "sunscreen", "lotion", "battery"],
+        other: ["tissue", "toilet", "diaper", "sponge", "sock", "shoe", "jean", "handkerchief", "wardrobe"]
+      };
+      (predictions || []).slice(0, 6).forEach(function (p, i) {
+        var weight = (p.probability || 0) * (1 - i * 0.12);
+        var t = String(p.className || "").toLowerCase();
+        Object.keys(groups).forEach(function (cat) {
+          groups[cat].forEach(function (k) {
+            if (t.indexOf(k) !== -1) scores[cat] += weight;
+          });
+        });
+      });
+      var bestKey = "other";
+      var bestScore = scores.other;
+      ["recyclable", "kitchen", "hazardous", "other"].forEach(function (k) {
+        if (scores[k] > bestScore) {
+          bestScore = scores[k];
+          bestKey = k;
+        }
+      });
+      return { categoryKey: bestKey, topLabel: predictions && predictions[0] ? predictions[0].className : "" };
+    }
+
+    function gcRenderImageClassifyResult(mapping, predictions) {
+      if (!imageResultArea) return;
+      var meta = CATEGORY_META[mapping.categoryKey];
+      var top3 = (predictions || []).slice(0, 3).map(function (p) {
+        return escapeHtml(p.className) + "（" + ((p.probability || 0) * 100).toFixed(1) + "%）";
+      }).join("；");
+      imageResultArea.innerHTML =
+        '<div class="result-card ' +
+        mapping.categoryKey +
+        '">' +
+        '<div class="result-name">图像推测：' +
+        escapeHtml(meta.name) +
+        "</div>" +
+        '<div class="result-category" style="color:' +
+        meta.color +
+        '">浏览器端模型（仅供参考）</div>' +
+        '<div class="result-desc">' +
+        escapeHtml(meta.desc) +
+        "</div>" +
+        '<p class="tips-box" style="margin-top:10px;font-size:0.88rem">ImageNet 前三匹配：' +
+        top3 +
+        "</p>" +
+        '<p class="tips-box" style="margin-top:8px;font-size:0.82rem;opacity:.9">轻量模型推断，不能代替人工与地方分类规定。</p>' +
+        "</div>";
+    }
+
     if (imageInput) {
-      imageInput.addEventListener("change", function() {
+      imageInput.addEventListener("change", function () {
         var f = imageInput.files && imageInput.files[0];
         if (imageResultArea) imageResultArea.innerHTML = "";
         clearImagePreview();
@@ -2094,16 +2204,61 @@
       });
     }
 
-    if (imageClassifyBtn) imageClassifyBtn.addEventListener("click", function () {
-      var f = imageInput.files && imageInput.files[0];
-      if (!f) {
-        alert("请先选择或拍摄一张图片");
-        return;
-      }
-      if (imageResultArea) imageResultArea.innerHTML =
-        '<div class="no-result"><div class="icon">🖼️</div><h3>纯前端模式不可用图像识别</h3>' +
-        '<p class="tips-box" style="margin-top:12px;text-align:left">本页为离线单页应用，未连接任何识别服务。若需 AI 识别，请自行部署后端（如 Node + Python 模型），并在改版中恢复接口调用。</p></div>';
-    });
+    if (imageClassifyBtn) {
+      imageClassifyBtn.addEventListener("click", function () {
+        var f = imageInput && imageInput.files && imageInput.files[0];
+        if (!f) {
+          alert("请先选择或拍摄一张图片");
+          return;
+        }
+        var img = imagePreview;
+        if (!img || !img.src) {
+          alert("预览未就绪，请重新选择图片");
+          return;
+        }
+        imageClassifyBtn.disabled = true;
+        if (imageResultArea) {
+          imageResultArea.innerHTML =
+            '<p class="tips-box" style="padding:12px">正在加载识别模型（首次需数秒，请保持联网）…</p>';
+        }
+        var pImg = new Promise(function (resolve) {
+          if (img.complete && img.naturalWidth) resolve();
+          else {
+            img.onload = function () {
+              resolve();
+            };
+            img.onerror = function () {
+              resolve();
+            };
+          }
+        });
+        pImg
+          .then(function () {
+            return gcEnsureMobilenetModel();
+          })
+          .then(function (model) {
+            return model.classify(img);
+          })
+          .then(function (predictions) {
+            var mapping = gcMapImageNetToGarbage(predictions);
+            gcRenderImageClassifyResult(mapping, predictions);
+          })
+          .catch(function (err) {
+            var msg = err && err.message ? err.message : String(err);
+            if (imageResultArea) {
+              imageResultArea.innerHTML =
+                '<div class="no-result"><div class="icon">⚠️</div><h3>识别未能完成</h3>' +
+                '<p class="tips-box" style="margin-top:12px;text-align:left">' +
+                escapeHtml(msg) +
+                "</p>" +
+                '<p class="tips-box" style="margin-top:8px;text-align:left;font-size:0.88rem">请尝试通过 <strong>https</strong> 网址打开页面、检查网络，或换用 Chrome / Edge 最新版。</p></div>';
+            }
+          })
+          .then(function () {
+            imageClassifyBtn.disabled = false;
+          });
+      });
+    }
 
     /* ========== 页头：滚动收缩样式类 + 移动端汉堡菜单 + 锚点点击后收起 ========== */
     (function () {
@@ -2343,6 +2498,152 @@
         });
       }
     }
+  </script>
+  <script>
+    /* ========== GC_APPEND_AUTH_V1：追加脚本（不修改上文任何一行）==========
+       依赖主脚本已提供的 UserModule / AppRouter / refreshUserUi。
+       通过克隆表单与退出按钮去除主脚本监听器，仅保留本段绑定，满足「独立封装 + auth-msg 提示」闭环。 */
+    (function () {
+      "use strict";
+      if (window.__GC_APPEND_AUTH_V1__) return;
+      window.__GC_APPEND_AUTH_V1__ = true;
+
+      if (typeof UserModule === "undefined") {
+        console.error("[GC_APPEND] UserModule 未定义");
+        return;
+      }
+
+      function showLoginErr(text) {
+        var el = document.getElementById("loginMsg");
+        if (el) {
+          el.textContent = text;
+          el.className = "auth-msg";
+        } else {
+          alert(text);
+        }
+      }
+
+      function rebindForm(formId, onSubmit) {
+        var f = document.getElementById(formId);
+        if (!f || f.getAttribute("data-gc-append-bound")) return;
+        var neu = f.cloneNode(true);
+        neu.setAttribute("data-gc-append-bound", "1");
+        f.parentNode.replaceChild(neu, f);
+        neu.addEventListener("submit", onSubmit);
+      }
+
+      function goHomeAfterLogin() {
+        if (typeof AppRouter !== "undefined" && AppRouter.showView) AppRouter.showView("home");
+        location.hash = "#/home";
+        if (typeof refreshUserUi === "function") refreshUserUi();
+        if (typeof AppRouter !== "undefined" && AppRouter.render) AppRouter.render();
+      }
+
+      function onLoginSubmit(e) {
+        e.preventDefault();
+        var msg = document.getElementById("loginMsg");
+        if (msg) {
+          msg.textContent = "";
+          msg.className = "auth-msg";
+        }
+        var uEl = document.getElementById("loginUser");
+        var pEl = document.getElementById("loginPass");
+        var u = uEl ? String(uEl.value).trim() : "";
+        var p = pEl ? String(pEl.value || "") : "";
+        if (!u || !p) {
+          showLoginErr("请输入账号和密码");
+          return;
+        }
+        var r = UserModule.login(u, p);
+        if (!r || !r.ok) {
+          showLoginErr((r && r.msg) || "登录失败");
+          return;
+        }
+        goHomeAfterLogin();
+      }
+
+      function onRegisterSubmit(e) {
+        e.preventDefault();
+        var regEl = document.getElementById("registerMsg");
+        if (!regEl) return;
+        regEl.textContent = "";
+        regEl.className = "auth-msg";
+        var ru = document.getElementById("regUser");
+        var rp1 = document.getElementById("regPass");
+        var rp2 = document.getElementById("regPass2");
+        var u = ru ? String(ru.value).trim() : "";
+        var p1 = rp1 ? String(rp1.value || "") : "";
+        var p2 = rp2 ? String(rp2.value || "") : "";
+        if (!/^[a-zA-Z0-9]{6,20}$/.test(u)) {
+          regEl.textContent = "账号需为 6-20 位字母或数字";
+          return;
+        }
+        if (!/^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,20}$/.test(p1)) {
+          regEl.textContent = "密码需 8-20 位，且同时包含字母与数字";
+          return;
+        }
+        if (p1 !== p2) {
+          regEl.textContent = "两次输入的密码不一致";
+          return;
+        }
+        var regResult = UserModule.register(u, p1);
+        if (!regResult || !regResult.ok) {
+          regEl.textContent = (regResult && regResult.msg) || "注册失败";
+          return;
+        }
+        regEl.className = "auth-msg ok";
+        regEl.textContent = "注册成功，请登录";
+        var tabLogin = document.getElementById("authTabLogin");
+        var tabReg = document.getElementById("authTabRegister");
+        var panelLogin = document.getElementById("panelLogin");
+        var panelReg = document.getElementById("panelRegister");
+        if (tabLogin) {
+          tabLogin.classList.add("is-on");
+          tabLogin.setAttribute("aria-selected", "true");
+        }
+        if (tabReg) {
+          tabReg.classList.remove("is-on");
+          tabReg.setAttribute("aria-selected", "false");
+        }
+        if (panelLogin) panelLogin.classList.add("is-on");
+        if (panelReg) panelReg.classList.remove("is-on");
+      }
+
+      function rebindLogout() {
+        var btn = document.getElementById("btnLogout");
+        if (!btn || btn.getAttribute("data-gc-append-bound")) return;
+        var neu = btn.cloneNode(true);
+        neu.setAttribute("data-gc-append-bound", "1");
+        btn.parentNode.replaceChild(neu, btn);
+        neu.addEventListener("click", function () {
+          UserModule.logout();
+          location.hash = "#/login";
+          if (typeof AppRouter !== "undefined" && AppRouter.render) AppRouter.render();
+        });
+      }
+
+      function boot() {
+        rebindForm("formLogin", onLoginSubmit);
+        rebindForm("formRegister", onRegisterSubmit);
+        rebindLogout();
+        try {
+          if (typeof AppRouter !== "undefined" && AppRouter.render) {
+            if (!location.hash || location.hash === "#") {
+              location.hash = UserModule.getCurrentUser() ? "#/home" : "#/login";
+            }
+            AppRouter.render();
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      }
+
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", boot);
+      } else {
+        boot();
+      }
+    })();
   </script>
 </body>
 </html>
