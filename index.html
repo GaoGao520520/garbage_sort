@@ -1166,7 +1166,7 @@
 </head>
 <body class="page-load">
   <!-- ========== SPA：登录/注册（Hash #/login）========== -->
-  <div id="spa-login" class="spa-view auth-page is-active" aria-hidden="false">
+  <div id="spa-login" class="spa-view auth-page is-active">
     <div class="auth-card">
       <h2>让垃圾回家—智能垃圾分类系统</h2>
       <div class="auth-tabs" role="tablist">
@@ -1211,7 +1211,7 @@
   </div>
 
   <!-- ========== SPA：主功能（Hash #/home）========== -->
-  <div id="spa-home" class="spa-view" aria-hidden="true">
+  <div id="spa-home" class="spa-view">
   <!-- 页头：主副标题 + 国标标签 + 锚点导航（滚动收缩 / 移动端汉堡） -->
   <header class="header" id="pageHeader" role="banner">
     <div class="header-inner">
@@ -1628,7 +1628,14 @@
         getCurrentUser: function () {
           try {
             var s = JSON.parse(localStorage.getItem(KEY_SESSION) || "null");
-            return s && s.username ? String(s.username) : null;
+            var u = s && s.username ? normalizeUsername(s.username) : null;
+            if (!u) return null;
+            var reg = getRegistry();
+            if (!reg[u]) {
+              this.clearSession();
+              return null;
+            }
+            return u;
           } catch (e) {
             return null;
           }
@@ -1731,18 +1738,13 @@
         if (!elLogin || !elHome) return;
         var ae = document.activeElement;
         if (name === "home") {
-          /* 避免焦点留在即将 aria-hidden 的登录层，消除控制台黄条警告 */
           if (ae && elLogin.contains(ae)) ae.blur();
           elHome.classList.add("is-active");
           elLogin.classList.remove("is-active");
-          elHome.setAttribute("aria-hidden", "false");
-          elLogin.setAttribute("aria-hidden", "true");
         } else {
           if (ae && elHome.contains(ae)) ae.blur();
           elLogin.classList.add("is-active");
           elHome.classList.remove("is-active");
-          elLogin.setAttribute("aria-hidden", "false");
-          elHome.setAttribute("aria-hidden", "true");
         }
       }
 
@@ -2254,6 +2256,9 @@
             return;
           }
           location.hash = "#/home";
+          if (typeof AppRouter !== "undefined" && AppRouter.render) {
+            AppRouter.render();
+          }
         } catch (err) {
           showLoginError("脚本异常：" + (err && err.message ? err.message : String(err)) + "（请尝试强制刷新页面）");
         }
