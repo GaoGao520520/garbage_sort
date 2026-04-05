@@ -1,0 +1,2254 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>让垃圾回家—智能垃圾分类系统 - GB/T 19095-2019</title>
+  <style>
+    /* ========== 基础与变量 ========== */
+    :root {
+      --primary: #2d8a5e;
+      --primary-light: #3da870;
+      --primary-dark: #1e6b45;
+      --recyclable: #0066cc;
+      --recyclable-bg: rgba(0, 102, 204, 0.12);
+      --kitchen: #00a651;
+      --kitchen-bg: rgba(0, 166, 81, 0.12);
+      --hazardous: #e60012;
+      --hazardous-bg: rgba(230, 0, 18, 0.12);
+      --other: #5c5c5c;
+      --other-bg: rgba(92, 92, 92, 0.12);
+      --bg: #f5f9f6;
+      --card-bg: #fff;
+      --text: #333;
+      --text-muted: #666;
+      --radius: 12px;
+      --shadow: 0 4px 16px rgba(45, 138, 94, 0.08);
+      --shadow-hover: 0 8px 24px rgba(45, 138, 94, 0.15);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ========== SPA 视图切换（#/login、#/home）========== */
+    .spa-view {
+      display: none;
+      min-height: 100vh;
+    }
+
+    .spa-view.is-active {
+      display: block;
+      animation: fadeIn 0.35s ease-out;
+    }
+
+    /* ========== 登录/注册页 ========== */
+    .auth-page {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 16px;
+      background: linear-gradient(135deg, #145a3a 0%, var(--primary-dark) 28%, var(--primary) 62%, #6bc49a 100%);
+    }
+
+    .auth-page::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.07;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cpath fill='%23ffffff' d='M40 8L52 20l-4 4-6-6v10h-4V18l-6 6-4-4L40 8zm0 64L28 52l4-4 6 6V44h4v16l6-6 4 4L40 72zM8 40l12-12 4 4-6 6h10v4H18l6 6-4 4L8 40zm64 0L60 52l-4-4 6-6H52v-4h16l-6-6 4-4 12 12z'/%3E%3C/svg%3E");
+      background-size: 80px 80px;
+    }
+
+    .auth-card {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 420px;
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      box-shadow: 0 16px 48px rgba(20, 90, 58, 0.35);
+      padding: 28px 24px 32px;
+    }
+
+    .auth-card h2 {
+      font-size: 1.2rem;
+      color: var(--primary-dark);
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .auth-tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 22px;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 2px solid #e0e8e2;
+    }
+
+    .auth-tab {
+      flex: 1;
+      padding: 12px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      border: none;
+      background: #f0f4f1;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+
+    .auth-tab.is-on {
+      background: var(--primary);
+      color: #fff;
+    }
+
+    .auth-panel {
+      display: none;
+    }
+
+    .auth-panel.is-on {
+      display: block;
+    }
+
+    .auth-field {
+      margin-bottom: 16px;
+    }
+
+    .auth-field label {
+      display: block;
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .auth-field .search-input {
+      width: 100%;
+    }
+
+    .auth-msg {
+      min-height: 1.4em;
+      font-size: 0.85rem;
+      color: #c0392b;
+      margin-bottom: 10px;
+    }
+
+    .auth-msg.ok {
+      color: var(--primary-dark);
+    }
+
+    .auth-submit {
+      width: 100%;
+      margin-top: 8px;
+    }
+
+    .auth-forgot {
+      display: block;
+      text-align: center;
+      margin-top: 14px;
+      font-size: 0.85rem;
+      color: var(--primary);
+      background: none;
+      border: none;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+
+    .header-user-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .header-username {
+      font-size: 0.82rem;
+      opacity: 0.92;
+      max-width: 120px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .header-logout-btn {
+      padding: 8px 14px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #fff;
+      background: rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.45);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.25s ease;
+    }
+
+    .header-logout-btn:hover {
+      background: rgba(255, 255, 255, 0.32);
+    }
+
+    /* 批量查询 / 历史 / 收藏 */
+    .batch-section {
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px dashed #e0e8e2;
+    }
+
+    .batch-section h3,
+    .user-data-section h3 {
+      font-size: 1rem;
+      color: var(--primary-dark);
+      margin-bottom: 10px;
+    }
+
+    .batch-textarea {
+      width: 100%;
+      min-height: 100px;
+      padding: 12px 14px;
+      font-size: 0.95rem;
+      border: 2px solid #e0e8e2;
+      border-radius: 10px;
+      resize: vertical;
+      font-family: inherit;
+      margin-bottom: 10px;
+    }
+
+    .batch-textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(45, 138, 94, 0.2);
+    }
+
+    .batch-result-area {
+      margin-top: 14px;
+      text-align: left;
+    }
+
+    .batch-line {
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+    }
+
+    .user-data-section {
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px dashed #e0e8e2;
+    }
+
+    .user-chip-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .user-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      font-size: 0.85rem;
+      background: #f0f4f1;
+      border: 1px solid #e0e8e2;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    .user-chip:hover {
+      background: rgba(45, 138, 94, 0.12);
+    }
+
+    .user-chip button {
+      border: none;
+      background: none;
+      color: #999;
+      cursor: pointer;
+      font-size: 1rem;
+      line-height: 1;
+      padding: 0 2px;
+    }
+
+    .fav-btn {
+      margin-top: 12px;
+      padding: 8px 16px;
+      font-size: 0.88rem;
+      border-radius: 8px;
+      border: 1px solid var(--primary);
+      background: #fff;
+      color: var(--primary-dark);
+      cursor: pointer;
+    }
+
+    .fav-btn.is-fav {
+      background: rgba(45, 138, 94, 0.15);
+    }
+
+    .image-offline-tip {
+      margin-top: 12px;
+      padding: 14px;
+      background: #fff9e6;
+      border: 1px solid #f0e0a0;
+      border-radius: 10px;
+      font-size: 0.88rem;
+      color: #666;
+    }
+
+    /* ========== 页面加载动效 ========== */
+    .page-load {
+      animation: fadeIn 0.5s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ========== 页头（GB/T 19095-2019 环保主题 + 导航 + 滚动收缩）========== */
+    .header {
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      color: #fff;
+      padding: 28px 20px 32px;
+      box-shadow: 0 4px 24px rgba(30, 107, 69, 0.35);
+      /* 深绿 → 浅绿线性渐变 */
+      background: linear-gradient(135deg, #145a3a 0%, var(--primary-dark) 28%, var(--primary) 62%, #6bc49a 100%);
+      transition: padding 0.35s ease, background 0.35s ease, box-shadow 0.35s ease;
+    }
+
+    /* 低透明度循环回收暗纹（简约不抢眼） */
+    .header::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.07;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cpath fill='%23ffffff' d='M40 8L52 20l-4 4-6-6v10h-4V18l-6 6-4-4L40 8zm0 64L28 52l4-4 6 6V44h4v16l6-6 4 4L40 72zM8 40l12-12 4 4-6 6h10v4H18l6 6-4 4L8 40zm64 0L60 52l-4-4 6-6H52v-4h16l-6-6 4-4 12 12z'/%3E%3C/svg%3E");
+      background-size: 80px 80px;
+    }
+
+    .header-inner {
+      position: relative;
+      z-index: 1;
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      flex-wrap: nowrap;
+    }
+
+    .header-brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      text-align: left;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .header-titles {
+      min-width: 0;
+    }
+
+    .header h1 {
+      font-size: clamp(1.65rem, 4.2vw, 2.15rem);
+      font-weight: 800;
+      margin: 0 0 10px 0;
+      letter-spacing: 0.5px;
+      line-height: 1.2;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+    }
+
+    .header--scrolled h1 {
+      font-size: clamp(1.25rem, 3.5vw, 1.55rem);
+      margin-bottom: 6px;
+    }
+
+    /* 国标依据：标签样式 */
+    .header-gb-tag {
+      display: inline-block;
+      font-size: clamp(0.72rem, 2.2vw, 0.85rem);
+      line-height: 1.45;
+      color: rgba(255, 255, 255, 0.96);
+      background: rgba(255, 255, 255, 0.18);
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      padding: 6px 12px;
+      border-radius: 999px;
+      backdrop-filter: blur(6px);
+    }
+
+    .header--scrolled .header-gb-tag {
+      font-size: 0.72rem;
+      padding: 4px 10px;
+    }
+
+    /* 右侧导航 */
+    .header-nav-toggle {
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      gap: 5px;
+      width: 44px;
+      height: 44px;
+      padding: 0;
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.12);
+      cursor: pointer;
+      transition: background 0.3s ease, transform 0.3s ease;
+    }
+
+    .header-nav-toggle span {
+      display: block;
+      width: 20px;
+      height: 2px;
+      margin: 0 auto;
+      background: #fff;
+      border-radius: 1px;
+      transition: transform 0.3s ease, opacity 0.3s ease;
+    }
+
+    .header-nav-toggle[aria-expanded="true"] span:nth-child(1) {
+      transform: translateY(7px) rotate(45deg);
+    }
+
+    .header-nav-toggle[aria-expanded="true"] span:nth-child(2) {
+      opacity: 0;
+    }
+
+    .header-nav-toggle[aria-expanded="true"] span:nth-child(3) {
+      transform: translateY(-7px) rotate(-45deg);
+    }
+
+    .header-nav-wrap {
+      flex-shrink: 0;
+    }
+
+    .header-nav {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .header-nav a {
+      display: inline-block;
+      padding: 8px 14px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #fff;
+      text-decoration: none;
+      border-radius: 10px;
+      border: 1px solid transparent;
+      transition:
+        background 0.3s ease,
+        color 0.3s ease,
+        border-color 0.3s ease,
+        transform 0.3s ease,
+        box-shadow 0.3s ease;
+    }
+
+    .header-nav a:hover {
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0.12) 100%);
+      border-color: rgba(255, 255, 255, 0.35);
+      transform: scale(1.05);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+    }
+
+    /* 滚动后：固定感 + 高度缩小 + 深绿 80% 透明度 */
+    .header.header--scrolled {
+      padding: 10px 16px 12px;
+      background: rgba(30, 107, 69, 0.8);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      box-shadow: 0 2px 16px rgba(20, 90, 58, 0.45);
+    }
+
+    .header.header--scrolled::before {
+      opacity: 0.05;
+    }
+
+    /* 锚点滚动时避开吸顶页头 */
+    #section-home,
+    #section-guide,
+    #section-image,
+    #section-science,
+    #section-quiz {
+      scroll-margin-top: 100px;
+    }
+
+    /* ========== 投放指南 / 答题区（与主内容风格一致）========== */
+    .guide-section,
+    .quiz-section {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: var(--shadow);
+    }
+
+    .guide-section h2,
+    .quiz-section h2 {
+      font-size: 1.25rem;
+      color: var(--primary-dark);
+      margin-bottom: 14px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid rgba(45, 138, 94, 0.25);
+    }
+
+    .guide-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .guide-list li {
+      position: relative;
+      padding: 10px 0 10px 1.25em;
+      font-size: 0.92rem;
+      color: var(--text-muted);
+      border-bottom: 1px dashed #e8ede9;
+    }
+
+    .guide-list li:last-child {
+      border-bottom: none;
+    }
+
+    .guide-list li::before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+      color: var(--primary);
+      font-weight: 700;
+    }
+
+    .quiz-question {
+      margin-bottom: 18px;
+      padding: 14px;
+      background: #f8faf9;
+      border-radius: 10px;
+      border: 1px solid #e0e8e2;
+    }
+
+    .quiz-question p {
+      font-weight: 600;
+      margin-bottom: 10px;
+      color: var(--text);
+    }
+
+    .quiz-options {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .quiz-options button {
+      padding: 8px 14px;
+      font-size: 0.88rem;
+      border: 1px solid #e0e8e2;
+      border-radius: 8px;
+      background: #fff;
+      cursor: pointer;
+      transition: background 0.2s ease, border-color 0.2s ease;
+    }
+
+    .quiz-options button:hover {
+      border-color: var(--primary);
+      background: rgba(45, 138, 94, 0.08);
+    }
+
+    .quiz-feedback {
+      margin-top: 8px;
+      font-size: 0.85rem;
+      min-height: 1.2em;
+    }
+
+    .quiz-feedback.ok {
+      color: var(--primary-dark);
+    }
+
+    .quiz-feedback.bad {
+      color: #c0392b;
+    }
+
+    /* ========== 页头响应式：&lt;768px 汉堡菜单 ========== */
+    @media (max-width: 767px) {
+      .header-inner {
+        flex-wrap: wrap;
+        align-items: flex-start;
+      }
+
+      .header-brand {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .header-nav-toggle {
+        display: flex;
+        flex-shrink: 0;
+      }
+
+      /* 强制导航单独占一行，与汉堡同页头首行对齐 */
+      .header-nav-wrap {
+        flex-basis: 100%;
+        width: 100%;
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.35s ease;
+      }
+
+      .header-nav-wrap.is-open {
+        max-height: 320px;
+      }
+
+      .header-nav {
+        flex-direction: column;
+        align-items: stretch;
+        padding-top: 12px;
+        gap: 6px;
+      }
+
+      .header-nav a {
+        text-align: center;
+      }
+    }
+
+    /* ========== 主容器 ========== */
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 24px 16px 40px;
+    }
+
+    /* ========== 搜索区 ========== */
+    .search-section {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: var(--shadow);
+      transition: box-shadow 0.3s ease;
+    }
+
+    .search-section:hover {
+      box-shadow: var(--shadow-hover);
+    }
+
+    .search-box {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 20px;
+      align-items: flex-start;
+    }
+
+    /* 搜索框 + 联想下拉（与主色统一） */
+    .search-field-wrap {
+      position: relative;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .search-suggest {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: calc(100% + 6px);
+      z-index: 60;
+      margin: 0;
+      padding: 6px 0;
+      list-style: none;
+      background: var(--card-bg);
+      border: 2px solid #c8e6d4;
+      border-radius: 10px;
+      box-shadow: 0 10px 28px rgba(45, 138, 94, 0.18);
+      max-height: min(280px, 50vh);
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .search-suggest[hidden] {
+      display: none !important;
+    }
+
+    .search-suggest-item {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+      text-align: left;
+      padding: 11px 16px;
+      font-size: clamp(0.88rem, 2.8vw, 0.98rem);
+      border: none;
+      background: transparent;
+      color: var(--text);
+      cursor: pointer;
+      transition: background 0.2s ease, color 0.2s ease;
+      border-bottom: 1px solid #eef5f0;
+    }
+
+    .search-suggest-item:last-child {
+      border-bottom: none;
+    }
+
+    .search-suggest-item:hover,
+    .search-suggest-item:focus {
+      background: rgba(45, 138, 94, 0.14);
+      color: var(--primary-dark);
+      outline: none;
+    }
+
+    /* 无结果时的智能纠错提示 */
+    .did-you-mean-box {
+      margin: 18px 0 8px;
+      padding: 12px 16px;
+      background: rgba(45, 138, 94, 0.09);
+      border: 1px solid rgba(45, 138, 94, 0.28);
+      border-radius: 10px;
+      font-size: 0.95rem;
+      line-height: 1.55;
+      text-align: center;
+    }
+
+    .did-you-mean-text {
+      color: var(--text-muted);
+    }
+
+    .did-you-mean-btn {
+      margin-left: 4px;
+      padding: 2px 6px;
+      font: inherit;
+      font-weight: 700;
+      color: var(--primary-dark);
+      background: rgba(255, 255, 255, 0.75);
+      border: 1px solid rgba(45, 138, 94, 0.35);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s ease, border-color 0.2s ease;
+    }
+
+    .did-you-mean-btn:hover,
+    .did-you-mean-btn:focus {
+      background: #fff;
+      border-color: var(--primary);
+      outline: none;
+    }
+
+    .search-input {
+      flex: 1;
+      padding: 14px 18px;
+      font-size: 1rem;
+      border: 2px solid #e0e8e2;
+      border-radius: 10px;
+      outline: none;
+      transition: border-color 0.25s ease, box-shadow 0.25s ease;
+    }
+
+    .search-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(45, 138, 94, 0.2);
+    }
+
+    .search-btn {
+      padding: 14px 28px;
+      font-size: 1rem;
+      font-weight: 600;
+      color: #fff;
+      background: var(--primary);
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.25s ease, transform 0.2s ease;
+      min-width: 100px;
+    }
+
+    .search-btn:hover {
+      background: var(--primary-light);
+      transform: translateY(-1px);
+    }
+
+    .search-btn:active {
+      transform: translateY(0);
+    }
+
+    /* ========== 图片识别区 ========== */
+    .image-section {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: var(--shadow);
+    }
+
+    .image-section h2 {
+      font-size: 1.15rem;
+      color: var(--primary-dark);
+      margin-bottom: 8px;
+    }
+
+    .image-section .sub {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+      line-height: 1.5;
+    }
+
+    .image-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .image-row input[type="file"] {
+      font-size: 0.9rem;
+    }
+
+    .image-btn {
+      padding: 12px 22px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #fff;
+      background: var(--primary-dark);
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.25s ease;
+    }
+
+    .image-btn:hover:not(:disabled) {
+      background: var(--primary);
+    }
+
+    .image-btn:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .image-preview-wrap {
+      margin-top: 12px;
+      text-align: center;
+    }
+
+    .image-preview-wrap img {
+      max-width: 100%;
+      max-height: 280px;
+      border-radius: 10px;
+      box-shadow: var(--shadow);
+      object-fit: contain;
+    }
+
+    .summary-box {
+      margin-top: 18px;
+      padding: 18px;
+      border-radius: 10px;
+      background: #f8faf9;
+      border: 1px solid #e0e8e2;
+    }
+
+    .summary-box .sum-title {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .summary-box .sum-hint {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      margin-top: 12px;
+      line-height: 1.55;
+    }
+
+    .rank-list {
+      margin-top: 14px;
+    }
+
+    .rank-item {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 8px 12px;
+      padding: 10px 0;
+      border-bottom: 1px dashed #e8ede9;
+      font-size: 0.92rem;
+    }
+
+    .rank-item:last-child {
+      border-bottom: none;
+    }
+
+    .badge-cat {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .badge-cat.recyclable { background: var(--recyclable); }
+    .badge-cat.kitchen { background: var(--kitchen); }
+    .badge-cat.hazardous { background: var(--hazardous); }
+    .badge-cat.other { background: var(--other); }
+
+    /* ========== 快捷查询区 ========== */
+    .quick-label {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      font-weight: 500;
+    }
+
+    .quick-btns {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .quick-btn {
+      padding: 10px 16px;
+      font-size: 0.9rem;
+      color: var(--text);
+      background: #f0f4f1;
+      border: 1px solid #e0e8e2;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.25s ease;
+    }
+
+    .quick-btn:hover {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+      transform: translateY(-2px);
+    }
+
+    /* ========== 搜索结果区 ========== */
+    .result-section {
+      margin-bottom: 32px;
+      min-height: 80px;
+    }
+
+    .result-card {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      padding: 24px;
+      box-shadow: var(--shadow);
+      border-left: 5px solid var(--primary);
+      animation: fadeIn 0.4s ease-out;
+    }
+
+    .result-card.recyclable { border-left-color: var(--recyclable); background: linear-gradient(to right, var(--recyclable-bg) 0%, var(--card-bg) 8%); }
+    .result-card.kitchen { border-left-color: var(--kitchen); background: linear-gradient(to right, var(--kitchen-bg) 0%, var(--card-bg) 8%); }
+    .result-card.hazardous { border-left-color: var(--hazardous); background: linear-gradient(to right, var(--hazardous-bg) 0%, var(--card-bg) 8%); }
+    .result-card.other { border-left-color: var(--other); background: linear-gradient(to right, var(--other-bg) 0%, var(--card-bg) 8%); }
+
+    .result-category {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .result-name {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: var(--text);
+    }
+
+    .result-desc {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+      line-height: 1.65;
+    }
+
+    /* ========== 无结果提示 ========== */
+    .no-result {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      padding: 28px;
+      box-shadow: var(--shadow);
+      text-align: center;
+      animation: fadeIn 0.4s ease-out;
+    }
+
+    .no-result .icon {
+      font-size: 3rem;
+      margin-bottom: 12px;
+      opacity: 0.6;
+    }
+
+    .no-result h3 {
+      font-size: 1.1rem;
+      color: var(--text-muted);
+      margin-bottom: 20px;
+    }
+
+    .tips-box {
+      text-align: left;
+      background: #f8faf9;
+      border-radius: 10px;
+      padding: 18px 20px;
+      margin-top: 16px;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+
+    .tips-box h4 {
+      color: var(--primary);
+      font-size: 0.95rem;
+      margin-bottom: 10px;
+    }
+
+    .tips-box ul {
+      list-style: none;
+      padding-left: 0;
+    }
+
+    .tips-box li {
+      padding: 4px 0;
+      padding-left: 1.2em;
+      position: relative;
+    }
+
+    .tips-box li::before {
+      content: "•";
+      position: absolute;
+      left: 0;
+      color: var(--primary);
+    }
+
+    /* ========== 分类科普区 ========== */
+    .science-section h2 {
+      font-size: 1.35rem;
+      color: var(--text);
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 3px solid var(--primary);
+      display: inline-block;
+    }
+
+    .science-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+    }
+
+    .science-card {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      padding: 22px;
+      box-shadow: var(--shadow);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      border-top: 4px solid var(--primary);
+    }
+
+    .science-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-hover);
+    }
+
+    .science-card.recyclable { border-top-color: var(--recyclable); }
+    .science-card.kitchen { border-top-color: var(--kitchen); }
+    .science-card.hazardous { border-top-color: var(--hazardous); }
+    .science-card.other { border-top-color: var(--other); }
+
+    .science-card .card-icon {
+      font-size: 2.2rem;
+      margin-bottom: 12px;
+    }
+
+    .science-card .card-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .science-card.recyclable .card-title { color: var(--recyclable); }
+    .science-card.kitchen .card-title { color: var(--kitchen); }
+    .science-card.hazardous .card-title { color: var(--hazardous); }
+    .science-card.other .card-title { color: var(--other); }
+
+    .science-card .card-desc {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      line-height: 1.55;
+    }
+
+    .science-card .card-examples {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+    }
+
+    .science-card .card-examples strong {
+      color: var(--text);
+    }
+
+    .science-card .card-tip {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      padding-top: 10px;
+      border-top: 1px dashed #e0e8e2;
+    }
+
+    /* ========== 页脚 ========== */
+    .footer {
+      text-align: center;
+      padding: 24px 16px;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    /* ========== 响应式 ========== */
+    @media (max-width: 600px) {
+      .search-box {
+        flex-direction: column;
+      }
+
+      .search-btn {
+        width: 100%;
+        min-height: 48px;
+      }
+
+      .quick-btn {
+        padding: 12px 16px;
+        min-height: 44px;
+      }
+
+      .container {
+        padding: 16px 12px 32px;
+      }
+
+      .result-card,
+      .no-result,
+      .search-section {
+        padding: 18px;
+      }
+    }
+  </style>
+</head>
+<body class="page-load">
+  <!-- ========== SPA：登录/注册（Hash #/login）========== -->
+  <div id="spa-login" class="spa-view auth-page is-active" aria-hidden="false">
+    <div class="auth-card">
+      <h2>让垃圾回家—智能垃圾分类系统</h2>
+      <div class="auth-tabs" role="tablist">
+        <button type="button" class="auth-tab is-on" id="authTabLogin" data-panel="panelLogin" role="tab" aria-selected="true">登录</button>
+        <button type="button" class="auth-tab" id="authTabRegister" data-panel="panelRegister" role="tab" aria-selected="false">注册</button>
+      </div>
+      <div id="panelLogin" class="auth-panel is-on" role="tabpanel">
+        <div class="auth-msg" id="loginMsg"></div>
+        <div class="auth-field">
+          <label for="loginUser">账号</label>
+          <input type="text" class="search-input" id="loginUser" placeholder="6-20 位字母或数字" maxlength="20" autocomplete="username">
+        </div>
+        <div class="auth-field">
+          <label for="loginPass">密码</label>
+          <input type="password" class="search-input" id="loginPass" placeholder="请输入密码" maxlength="20" autocomplete="current-password">
+        </div>
+        <button type="button" class="search-btn auth-submit" id="btnDoLogin">登录</button>
+        <button type="button" class="auth-forgot" id="btnForgot">忘记密码？</button>
+      </div>
+      <div id="panelRegister" class="auth-panel" role="tabpanel">
+        <div class="auth-msg" id="registerMsg"></div>
+        <div class="auth-field">
+          <label for="regUser">账号</label>
+          <input type="text" class="search-input" id="regUser" placeholder="6-20 位字母或数字" maxlength="20" autocomplete="off">
+        </div>
+        <div class="auth-field">
+          <label for="regPass">密码（8-20 位，含字母+数字）</label>
+          <input type="password" class="search-input" id="regPass" placeholder="设置密码" maxlength="20" autocomplete="new-password">
+        </div>
+        <div class="auth-field">
+          <label for="regPass2">确认密码</label>
+          <input type="password" class="search-input" id="regPass2" placeholder="再次输入密码" maxlength="20" autocomplete="new-password">
+        </div>
+        <button type="button" class="search-btn auth-submit" id="btnDoRegister">注册</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== SPA：主功能（Hash #/home）========== -->
+  <div id="spa-home" class="spa-view" aria-hidden="true">
+  <!-- 页头：主副标题 + 国标标签 + 锚点导航（滚动收缩 / 移动端汉堡） -->
+  <header class="header" id="pageHeader" role="banner">
+    <div class="header-inner">
+      <div class="header-brand">
+        <div class="header-titles">
+          <h1>让垃圾回家—智能垃圾分类系统</h1>
+          <div class="header-gb-tag" role="note">依据 GB/T 19095-2019《城市生活垃圾分类标志》</div>
+        </div>
+      </div>
+      <button type="button" class="header-nav-toggle" id="headerNavToggle" aria-label="展开或收起导航" aria-expanded="false" aria-controls="headerNavWrap">
+        <span></span><span></span><span></span>
+      </button>
+      <div class="header-nav-wrap" id="headerNavWrap">
+        <nav class="header-nav header-user-row" aria-label="页面板块导航">
+          <span class="header-username" id="headerUsername" title=""></span>
+          <a href="#/home" data-scroll="section-home">首页</a>
+          <a href="#/home" data-scroll="section-guide">投放指南</a>
+          <a href="#/home" data-scroll="section-science">科普专栏</a>
+          <a href="#/home" data-scroll="section-quiz">答题小游戏</a>
+          <button type="button" class="header-logout-btn" id="btnLogout">退出登录</button>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- 搜索区（首页锚点） -->
+    <section class="search-section" id="section-home">
+      <div class="search-box">
+        <div class="search-field-wrap">
+          <input type="text" class="search-input" id="searchInput" placeholder="输入垃圾名称或拼音首字母，如：塑料瓶、gp…" maxlength="30" autocomplete="off" aria-autocomplete="list" aria-controls="searchSuggestPanel" aria-expanded="false" role="combobox">
+          <div id="searchSuggestPanel" class="search-suggest" hidden role="listbox" aria-label="垃圾名称联想"></div>
+        </div>
+        <button type="button" class="search-btn" id="searchBtn">查询</button>
+      </div>
+      <p class="quick-label">快捷查询（点击即可）</p>
+      <div class="quick-btns" id="quickBtns"></div>
+      <div class="batch-section">
+        <h3>批量查询</h3>
+        <p class="quick-label" style="margin-bottom:8px">每行一个名称，或用逗号、分号分隔多个名称</p>
+        <textarea class="batch-textarea" id="batchInput" placeholder="例如：&#10;塑料瓶&#10;电池,果皮" maxlength="2000"></textarea>
+        <button type="button" class="search-btn" id="batchSearchBtn">批量查询</button>
+        <div class="batch-result-area" id="batchResultArea"></div>
+      </div>
+      <div class="user-data-section">
+        <h3>查询历史</h3>
+        <div class="user-chip-list" id="historyChips"></div>
+      </div>
+      <div class="user-data-section">
+        <h3>收藏夹</h3>
+        <div class="user-chip-list" id="favChips"></div>
+      </div>
+    </section>
+
+    <!-- 搜索结果区（紧跟搜索框下方） -->
+    <section class="result-section" id="resultSection"></section>
+
+    <!-- 投放指南（锚点：投放指南） -->
+    <section class="guide-section" id="section-guide">
+      <h2>投放指南</h2>
+      <ul class="guide-list">
+        <li>先分清「可回收物、厨余垃圾、有害垃圾、其他垃圾」四类，再按容器标识投放。</li>
+        <li>可回收物保持清洁干燥，立体包装清空、压扁；玻璃、金属注意防割伤。</li>
+        <li>厨余垃圾沥干水分，去除塑料袋等包装后再投放；流质厨余可按当地要求处理。</li>
+        <li>有害垃圾保持密闭、轻放；易碎、易挥发物品建议原包装或包裹后投放。</li>
+        <li>无法判断时可查阅本页搜索与科普，或咨询当地分类管理要求。</li>
+      </ul>
+    </section>
+
+    <!-- 图片识别区（纯前端模式：界面保留，识别需自建后端） -->
+    <section class="image-section" id="section-image">
+      <h2>📷 拍照 / 选图识别</h2>
+      <p class="sub">本页为<strong>纯前端单页应用</strong>，不连接任何服务器。以下仅为界面示意；真实 AI 识别需自行部署 Node + Python 等服务。</p>
+      <div class="image-offline-tip">
+        <strong>说明：</strong>当前版本已关闭联网识别。您仍可选图预览；点击「开始识别」将提示此功能需后端支持，不会在本地调用接口。
+      </div>
+      <div class="image-row">
+        <input type="file" id="imageInput" accept="image/*" capture="environment" />
+        <button type="button" class="image-btn" id="imageClassifyBtn">开始识别</button>
+      </div>
+      <div class="image-preview-wrap" id="imagePreviewWrap" style="display:none;">
+        <img id="imagePreview" alt="预览" />
+      </div>
+      <div id="imageResultArea"></div>
+    </section>
+
+    <!-- 分类科普区（锚点：科普专栏） -->
+    <section class="science-section" id="section-science">
+      <h2>四类垃圾科普</h2>
+      <div class="science-grid">
+        <div class="science-card recyclable">
+          <div class="card-icon">♻️</div>
+          <div class="card-title">可回收物</div>
+          <div class="card-desc">适宜回收利用和资源化利用的生活废弃物。</div>
+          <div class="card-examples"><strong>常见：</strong>纸张、塑料、玻璃、金属、织物、饮料瓶</div>
+          <div class="card-tip">投放：清洁干燥，压扁后投放</div>
+        </div>
+        <div class="science-card kitchen">
+          <div class="card-icon">🥬</div>
+          <div class="card-title">厨余垃圾（湿垃圾）</div>
+          <div class="card-desc">易腐烂的、含有机质的生活废弃物。</div>
+          <div class="card-examples"><strong>常见：</strong>剩饭剩菜、果皮、菜叶、茶叶渣、蛋壳</div>
+          <div class="card-tip">投放：沥干水分，去除包装后投放</div>
+        </div>
+        <div class="science-card hazardous">
+          <div class="card-icon">⚠️</div>
+          <div class="card-title">有害垃圾</div>
+          <div class="card-desc">对人体健康或自然环境造成直接或潜在危害的生活废弃物。</div>
+          <div class="card-examples"><strong>常见：</strong>电池、灯管、药品、油漆桶、杀虫剂</div>
+          <div class="card-tip">投放：密封后投放，避免破损</div>
+        </div>
+        <div class="science-card other">
+          <div class="card-icon">🗑️</div>
+          <div class="card-title">其他垃圾（干垃圾）</div>
+          <div class="card-desc">除可回收物、厨余垃圾、有害垃圾以外的其他生活废弃物。</div>
+          <div class="card-examples"><strong>常见：</strong>餐巾纸、烟蒂、尘土、一次性餐具、污染纸张</div>
+          <div class="card-tip">投放：沥干后投放</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 答题小游戏（锚点） -->
+    <section class="quiz-section" id="section-quiz">
+      <h2>答题小游戏</h2>
+      <p class="sub" style="margin-bottom:16px;color:var(--text-muted);font-size:0.9rem;">点击选项即可查看对错，巩固 GB/T 19095-2019 四类生活垃圾常识。</p>
+      <div id="quizMount"></div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    数据与分类依据 GB/T 19095-2019 · 仅供参考，以当地规定为准<br />
+    <span style="font-size:0.8rem;opacity:.9">纯前端运行：双击本 HTML 或通过任意静态地址打开即可；用户与历史数据保存在本机 localStorage。</span>
+  </footer>
+  </div><!-- /#spa-home -->
+
+  <script>
+    /**
+     * 架构：数据模块(WASTE_DATA 等) → 用户模块(UserModule) → 路由模块(AppRouter) → 功能模块(DOM 搜索/批量/收藏等)
+     * 纯前端：Hash 路由 #/login | #/home，用户与历史等存 localStorage，无需服务器。
+     */
+    /* ========== 数据模块：垃圾分类 JSON（GB/T 19095-2019，嵌入页面）========== */
+    const WASTE_DATA = {
+      /* 可回收物 - 蓝色 */
+      recyclable: [
+        "报纸", "书本", "打印纸", "纸箱", "纸盒", "纸袋", "信封", "广告单", "牛奶盒", "饮料盒",
+        "塑料瓶", "矿泉水瓶", "饮料瓶", "洗发水瓶", "沐浴露瓶", "塑料桶", "塑料盒", "塑料盆",
+        "玻璃瓶", "酒瓶", "玻璃杯", "碎玻璃", "镜子", "玻璃制品",
+        "易拉罐", "金属罐", "铁罐", "铝罐", "金属厨具", "钥匙", "剪刀", "铁钉", "铜线",
+        "旧衣服", "旧鞋子", "背包", "床单", "窗帘", "毛巾", "毛绒玩具",
+        "泡沫箱", "泡沫塑料", "塑料衣架", "塑料玩具", "CD", "光盘", "电线", "插头",
+        "快递纸箱", "包装纸箱", "硬纸板", "杂志", "宣传册", "日历", "笔记本", "便签纸",
+        "塑料瓶盖", "塑料包装", "酸奶杯", "塑料餐盒", "保鲜盒", "塑料碗", "塑料勺",
+        "不锈钢杯", "不锈钢碗", "锅", "铁锅", "铝锅", "易拉罐盖",
+        "旧书包", "皮革制品", "皮带", "帆布包", "编织袋", "铁皮", "铜", "铝", "锡"
+      ],
+      /* 厨余垃圾（湿垃圾）- 绿色 */
+      kitchen: [
+        "剩饭", "剩菜", "米饭", "面条", "馒头", "包子", "面包", "蛋糕", "饼干", "糕点",
+        "果皮", "苹果核", "香蕉皮", "橙子皮", "西瓜皮", "葡萄皮", "桃核", "杏核", "荔枝壳", "龙眼壳",
+        "菜叶", "菜根", "菜帮", "土豆皮", "萝卜皮", "黄瓜头", "辣椒", "葱叶", "蒜皮", "姜皮",
+        "茶叶渣", "咖啡渣", "中药渣", "甘蔗渣", "玉米棒", "玉米衣", "瓜子壳", "花生壳", "核桃壳",
+        "蛋壳", "鱼骨", "鸡骨", "鸭骨", "猪骨", "虾壳", "蟹壳", "贝壳",
+        "过期粮食", "过期食品", "宠物饲料", "水果核", "果肉", "蔬菜叶", "豆渣",
+        "火锅底料", "调味料", "酱料", "番茄酱", "沙拉", "果酱", "蜂蜜罐残留",
+        "鲜花", "枯萎植物", "树叶", "盆栽土", "绿植", "瓜子皮", "花生皮", "开心果壳",
+        "草莓蒂", "樱桃核", "枣核", "芒果核", "枇杷核", "杨梅核", "火龙果皮", "猕猴桃皮"
+      ],
+      /* 有害垃圾 - 红色 */
+      hazardous: [
+        "电池", "纽扣电池", "充电电池", "干电池", "锂电池", "蓄电池",
+        "灯管", "荧光灯管", "节能灯", "LED灯", "灯泡", "日光灯",
+        "温度计", "血压计", "过期药品", "药片", "胶囊", "药瓶", "药膏", "创可贴",
+        "油漆桶", "油漆", "涂料", "颜料", "染发剂", "指甲油", "洗甲水",
+        "杀虫剂", "蚊香", "消毒剂", "消毒液", "洁厕灵", "84消毒液",
+        "农药", "老鼠药", "蟑螂药", "除草剂",
+        "X光片", "CT片", "相片底片", "胶卷",
+        "水银温度计", "水银血压计", "含汞物品",
+        "废胶片", "废相纸", "打印机墨盒", "硒鼓", "碳粉盒", "电子烟", "镍镉电池"
+      ],
+      /* 其他垃圾（干垃圾）- 灰色 */
+      other: [
+        "餐巾纸", "纸巾", "湿巾", "卫生纸", "纸尿裤", "卫生巾", "护垫",
+        "烟蒂", "烟头", "烟灰", "牙签", "牙线", "棉签", "棉棒",
+        "一次性筷子", "一次性餐盒", "一次性杯子", "一次性餐具", "吸管",
+        "塑料袋", "保鲜膜", "污损塑料袋", "污损塑料",
+        "污染纸张", "油污纸", "胶带", "透明胶", "双面胶", "贴纸",
+        "尘土", "灰尘", "头发", "宠物粪便", "猫砂", "狗屎",
+        "陶瓷", "陶瓷碗", "陶瓷杯", "碎陶瓷", "砖瓦", "渣土",
+        "口香糖", "橡皮泥", "笔", "圆珠笔", "中性笔", "记号笔", "胶水", "修正带",
+        "一次性手套", "口罩", "创可贴外包装", "尿不湿", "湿纸巾包装",
+        "脏衣服", "脏袜子", "污损织物", "拖把", "抹布", "百洁布",
+        "干燥剂", "防潮剂", "暖宝宝", "暖贴", "过期化妆品", "口红", "粉底", "睫毛膏",
+        "一次性口罩", "滤芯", "滤网", "海绵", "洗碗海绵",
+        "大骨头", "牛骨头", "羊骨头", "猪大骨", "榴莲壳", "椰子壳", "扇贝壳",
+        "粽叶", "甘蔗皮", "榴莲核", "桃核", "椰子壳", "外卖盒", "脏塑料袋",
+        "用过的纸巾", "擦手纸", "厨房用纸", "宠物毛发", "羽毛", "贝壳（大）"
+      ]
+    };
+
+    /* 分类元信息：标准色、名称、投放说明 */
+    const CATEGORY_META = {
+      recyclable: {
+        name: "可回收物",
+        color: "#0066cc",
+        desc: "请保持清洁干燥，避免污染；立体包装请清空内容物、压扁后投放；玻璃类请小心轻放，有尖锐边角的应包裹后投放。"
+      },
+      kitchen: {
+        name: "厨余垃圾（湿垃圾）",
+        color: "#00a651",
+        desc: "请沥干水分后投放；纯流质的食物垃圾（如牛奶、豆浆）应直接倒入下水道；有包装物的请去除包装后分类投放。"
+      },
+      hazardous: {
+        name: "有害垃圾",
+        color: "#e60012",
+        desc: "请密封后投放，注意轻放；易破损的请连带包装或包裹后投放；如易挥发，请密封后投放。"
+      },
+      other: {
+        name: "其他垃圾（干垃圾）",
+        color: "#5c5c5c",
+        desc: "请沥干水分后投放；难以辨识类别的生活垃圾可投入其他垃圾收集容器。"
+      }
+    };
+
+    /* 无结果时的分类口诀/指引 */
+    const TIPS_TEXT = {
+      title: "未找到该垃圾名称，可参考以下分类原则：",
+      items: [
+        "可回收物：能卖钱的、能再生利用的（纸、塑料、玻璃、金属、织物等）",
+        "厨余垃圾：易腐烂的、会烂的（剩饭剩菜、果皮、菜叶、蛋壳等）",
+        "有害垃圾：对身体或环境有害的（电池、灯管、药品、油漆、杀虫剂等）",
+        "其他垃圾：以上都不是的（餐巾纸、烟蒂、一次性餐具、污染纸张等）"
+      ]
+    };
+
+    /* 快捷按钮词条（20+ 高频） */
+    const QUICK_ITEMS = [
+      "塑料瓶", "纸箱", "电池", "剩饭", "果皮", "餐巾纸", "易拉罐", "玻璃瓶",
+      "过期药品", "茶叶渣", "一次性筷子", "旧衣服", "灯管", "菜叶", "烟蒂",
+      "牛奶盒", "塑料袋", "蛋壳", "快递盒", "化妆品", "骨头", "外卖盒", "口罩"
+    ];
+
+    /* ========== 构建搜索索引（名称 -> 分类）========== */
+    const searchIndex = {};
+    Object.keys(WASTE_DATA).forEach(function(cat) {
+      WASTE_DATA[cat].forEach(function(name) {
+        var key = name.trim().toLowerCase();
+        if (!searchIndex[key]) searchIndex[key] = [];
+        if (searchIndex[key].indexOf(cat) === -1) searchIndex[key].push(cat);
+      });
+    });
+
+
+    /* ========== 全库名称、拼音首字母、联想与纠错 ========== */
+    /* 汉字→拼音首字母：仅覆盖本页 WASTE_DATA 已出现的汉字；词库增删后可用 pypinyin 等工具按用字重生成 */
+    const PY_INITIAL={"一":"y","不":"b","中":"z","书":"s","他":"t","传":"c","余":"y","便":"b","保":"b","信":"x","修":"x","充":"c","光":"g","其":"q","具":"j","册":"c","农":"n","刀":"d","创":"c","制":"z","剂":"j","剩":"s","剪":"j","勺":"s","包":"b","化":"h","匙":"s","单":"d","卖":"m","卜":"b","卫":"w","印":"y","卷":"j","历":"l","压":"y","厕":"c","厨":"c","双":"s","发":"f","口":"k","可":"k","叶":"y","号":"h","含":"h","吸":"x","告":"g","味":"w","咖":"k","品":"p","啡":"f","囊":"n","回":"h","圆":"y","土":"t","圾":"j","垃":"l","垫":"d","塑":"s","墨":"m","壳":"k","外":"w","大":"d","头":"t","套":"t","奶":"n","妆":"z","姜":"j","子":"z","宝":"b","宠":"c","宣":"x","害":"h","封":"f","尘":"c","尿":"n","屎":"s","属":"s","巾":"j","布":"b","帆":"f","帘":"l","带":"d","帮":"b","干":"g","广":"g","床":"c","底":"d","废":"f","度":"d","开":"k","张":"z","心":"x","志":"z","快":"k","性":"x","房":"f","扇":"s","手":"s","打":"d","扣":"k","把":"b","护":"h","报":"b","抹":"m","拉":"l","拖":"t","指":"z","损":"s","插":"c","擦":"c","收":"s","料":"l","日":"r","旧":"j","明":"m","易":"y","暖":"n","有":"y","服":"f","期":"q","本":"b","机":"j","杀":"s","杂":"z","杏":"x","条":"t","杨":"y","杯":"b","杷":"p","板":"b","枇":"p","果":"g","枝":"z","枣":"z","枯":"k","架":"j","染":"r","树":"s","核":"h","根":"g","栽":"z","桃":"t","桶":"t","梅":"m","棉":"m","棒":"b","植":"z","椒":"j","椰":"y","榴":"l","樱":"y","橙":"c","橡":"x","次":"c","正":"z","残":"c","毒":"d","毛":"m","水":"s","汞":"g","池":"c","污":"w","沐":"m","沙":"s","沫":"m","油":"y","泉":"q","泡":"p","泥":"n","洁":"j","洗":"x","浴":"y","海":"h","涂":"t","消":"x","液":"y","渣":"z","温":"w","湿":"s","滤":"l","漆":"q","潮":"c","火":"h","灯":"d","灰":"h","灵":"l","点":"d","烟":"y","燥":"z","片":"p","牙":"y","牛":"n","物":"w","狗":"g","猕":"m","猪":"z","猫":"m","猴":"h","玉":"y","玩":"w","玻":"b","珠":"z","璃":"l","瓜":"g","瓦":"w","瓶":"p","瓷":"c","甘":"g","生":"s","用":"y","甲":"j","电":"d","留":"l","番":"f","百":"b","的":"d","皮":"p","盆":"p","盒":"h","盖":"g","盘":"p","相":"x","眼":"y","睫":"j","矿":"k","砂":"s","砖":"z","硒":"x","硬":"y","碎":"s","碗":"w","碳":"t","窗":"c","笔":"b","筷":"k","签":"q","管":"g","箱":"x","米":"m","粉":"f","粪":"f","粮":"l","粽":"z","糕":"g","糖":"t","红":"h","纸":"z","纽":"n","线":"x","织":"z","绒":"r","绵":"m","绿":"l","编":"b","罐":"g","网":"w","罩":"z","羊":"y","羽":"y","老":"l","肉":"r","背":"b","胶":"j","能":"n","脏":"z","膏":"g","膜":"m","色":"s","节":"j","芒":"m","芯":"x","花":"h","苹":"p","茄":"j","茶":"c","草":"c","荔":"l","荧":"y","药":"y","莓":"m","莲":"l","菜":"c","萄":"t","萎":"w","萝":"l","葡":"p","葱":"c","蒂":"d","蒜":"s","蓄":"x","蓝":"l","蔗":"z","蔬":"s","蕉":"j","虫":"c","虾":"x","蚊":"w","蛋":"d","蜂":"f","蜜":"m","螂":"l","蟑":"z","蟹":"x","血":"x","衣":"y","袋":"d","袜":"w","装":"z","裤":"k","西":"x","计":"j","记":"j","调":"d","豆":"d","贝":"b","贴":"t","辣":"l","过":"g","透":"t","递":"d","酒":"j","酱":"j","酸":"s","金":"j","钉":"d","钢":"g","钥":"y","铁":"t","铜":"t","铝":"l","银":"y","锂":"l","锅":"g","锈":"x","锡":"x","镉":"g","镍":"n","镜":"j","防":"f","除":"c","陶":"t","露":"l","面":"m","革":"g","鞋":"x","颜":"y","食":"s","餐":"c","饭":"f","饮":"y","饲":"s","饼":"b","馒":"m","香":"x","骨":"g","鱼":"y","鲜":"x","鸡":"j","鸭":"y","黄":"h","鼓":"g","鼠":"s","龙":"l"};
+
+    const ALL_WASTE_NAMES = [];
+    Object.keys(WASTE_DATA).forEach(function (cat) {
+      WASTE_DATA[cat].forEach(function (name) {
+        if (ALL_WASTE_NAMES.indexOf(name) === -1) ALL_WASTE_NAMES.push(name);
+      });
+    });
+
+    /** 词条拼音首字母串（仅 a-z，用于 gp→果皮 等） */
+    function wordInitials(str) {
+      var buf = "";
+      for (var i = 0; i < str.length; i++) {
+        var c = str[i];
+        if (/[A-Za-z]/.test(c)) buf += c.toLowerCase();
+        else buf += PY_INITIAL[c] || "";
+      }
+      return buf;
+    }
+
+    var _initialsCache = Object.create(null);
+    function getWordInitials(name) {
+      if (_initialsCache[name] === undefined) _initialsCache[name] = wordInitials(name);
+      return _initialsCache[name];
+    }
+
+    /** 编辑距离（错别字最接近词条） */
+    function levenshtein(a, b) {
+      if (a === b) return 0;
+      var la = a.length, lb = b.length, i, j, prev, tmp, cost;
+      if (!la) return lb;
+      if (!lb) return la;
+      var row = new Array(lb + 1);
+      for (j = 0; j <= lb; j++) row[j] = j;
+      for (i = 1; i <= la; i++) {
+        prev = row[0];
+        row[0] = i;
+        for (j = 1; j <= lb; j++) {
+          tmp = row[j];
+          cost = a.charCodeAt(i - 1) === b.charCodeAt(j - 1) ? 0 : 1;
+          row[j] = Math.min(row[j] + 1, row[j - 1] + 1, prev + cost);
+          prev = tmp;
+        }
+      }
+      return row[lb];
+    }
+
+    /** 无精确匹配时，返回最接近的垃圾名称（含错字场景） */
+    function findTypoSuggestion(raw) {
+      if (!raw || raw.length < 2) return null;
+      var best = null, bestD = 999, k, n, d, maxLen, thresh;
+      for (k = 0; k < ALL_WASTE_NAMES.length; k++) {
+        n = ALL_WASTE_NAMES[k];
+        if (n === raw) continue;
+        d = levenshtein(raw, n);
+        maxLen = Math.max(raw.length, n.length);
+        thresh = maxLen <= 2 ? 1 : maxLen <= 4 ? 2 : Math.min(3, Math.floor(maxLen * 0.4));
+        if (d <= thresh && (d < bestD || (d === bestD && best != null && n.length < best.length))) {
+          bestD = d;
+          best = n;
+        }
+      }
+      if (best === null || bestD > 3) return null;
+      return best;
+    }
+
+    var SUGGEST_LIMIT = 10;
+    /** 联想：汉字子串优先；纯字母按拼音首字母匹配，最多 10 条 */
+    function collectSuggestions(query) {
+      var q = query.trim();
+      if (!q) return [];
+      var onlyLetters = /^[a-zA-Z]+$/.test(q);
+      var lower = q.toLowerCase();
+      var hits = [];
+      var i, name, ini, score;
+      for (i = 0; i < ALL_WASTE_NAMES.length; i++) {
+        name = ALL_WASTE_NAMES[i];
+        score = 0;
+        if (onlyLetters) {
+          ini = getWordInitials(name);
+          if (ini.indexOf(lower) === 0) score = 300 - name.length;
+          else if (ini.indexOf(lower) > -1) score = 150 - name.length;
+        } else {
+          if (name.indexOf(q) === 0) score = 400 - name.length;
+          else if (name.indexOf(q) > -1) score = 200 - name.length;
+        }
+        if (score > 0) hits.push({ name: name, score: score });
+      }
+      hits.sort(function (x, y) {
+        if (y.score !== x.score) return y.score - x.score;
+        return x.name.length - y.name.length;
+      });
+      var out = [];
+      var seen = Object.create(null);
+      for (i = 0; i < hits.length && out.length < SUGGEST_LIMIT; i++) {
+        name = hits[i].name;
+        if (!seen[name]) {
+          seen[name] = 1;
+          out.push(name);
+        }
+      }
+      return out;
+    }
+
+    /* ========== 用户模块：localStorage + 密码 Base64（非加密，仅防明文）========== */
+    var UserModule = (function () {
+      var KEY_SESSION = "gc_session_v1";
+      var KEY_REGISTRY = "gc_users_registry_v1";
+
+      function encodePassword(p) {
+        try {
+          return btoa(unescape(encodeURIComponent(p)));
+        } catch (e) {
+          return btoa(p);
+        }
+      }
+
+      function getRegistry() {
+        try {
+          return JSON.parse(localStorage.getItem(KEY_REGISTRY) || "{}");
+        } catch (e) {
+          return {};
+        }
+      }
+
+      function saveRegistry(o) {
+        localStorage.setItem(KEY_REGISTRY, JSON.stringify(o));
+      }
+
+      function profileKey(u) {
+        return "gc_user_profile_" + u;
+      }
+
+      function getProfile(username) {
+        var def = { history: [], favorites: [], quiz: [] };
+        try {
+          var o = JSON.parse(localStorage.getItem(profileKey(username)) || "null");
+          if (!o) return JSON.parse(JSON.stringify(def));
+          if (!Array.isArray(o.history)) o.history = [];
+          if (!Array.isArray(o.favorites)) o.favorites = [];
+          if (!Array.isArray(o.quiz)) o.quiz = [];
+          return o;
+        } catch (e) {
+          return JSON.parse(JSON.stringify(def));
+        }
+      }
+
+      function saveProfile(username, p) {
+        localStorage.setItem(profileKey(username), JSON.stringify(p));
+      }
+
+      return {
+        encodePassword: encodePassword,
+        getCurrentUser: function () {
+          try {
+            var s = JSON.parse(localStorage.getItem(KEY_SESSION) || "null");
+            return s && s.username ? String(s.username) : null;
+          } catch (e) {
+            return null;
+          }
+        },
+        setSession: function (username) {
+          localStorage.setItem(KEY_SESSION, JSON.stringify({ username: username, at: Date.now() }));
+        },
+        clearSession: function () {
+          localStorage.removeItem(KEY_SESSION);
+        },
+        register: function (username, password) {
+          var reg = getRegistry();
+          if (reg[username]) return { ok: false, msg: "该账号已被注册" };
+          reg[username] = { passwordB64: encodePassword(password) };
+          saveRegistry(reg);
+          saveProfile(username, getProfile(username));
+          return { ok: true };
+        },
+        login: function (username, password) {
+          var reg = getRegistry();
+          if (!reg[username]) return { ok: false, msg: "账号不存在" };
+          if (reg[username].passwordB64 !== encodePassword(password)) return { ok: false, msg: "密码错误" };
+          this.setSession(username);
+          return { ok: true };
+        },
+        logout: function () {
+          this.clearSession();
+        },
+        addHistory: function (keyword, categoryKey, displayName) {
+          var u = this.getCurrentUser();
+          if (!u) return;
+          var p = getProfile(u);
+          p.history.unshift({ keyword: keyword, categoryKey: categoryKey, displayName: displayName, t: Date.now() });
+          p.history = p.history.slice(0, 80);
+          saveProfile(u, p);
+        },
+        getHistory: function () {
+          var u = this.getCurrentUser();
+          return u ? getProfile(u).history : [];
+        },
+        getFavorites: function () {
+          var u = this.getCurrentUser();
+          return u ? getProfile(u).favorites : [];
+        },
+        isFavorite: function (displayName) {
+          var favs = this.getFavorites();
+          for (var i = 0; i < favs.length; i++) {
+            if (favs[i].name === displayName) return true;
+          }
+          return false;
+        },
+        toggleFavorite: function (displayName, categoryKey) {
+          var u = this.getCurrentUser();
+          if (!u) return false;
+          var p = getProfile(u);
+          var idx = -1;
+          for (var i = 0; i < p.favorites.length; i++) {
+            if (p.favorites[i].name === displayName) {
+              idx = i;
+              break;
+            }
+          }
+          if (idx >= 0) p.favorites.splice(idx, 1);
+          else p.favorites.push({ name: displayName, categoryKey: categoryKey, t: Date.now() });
+          saveProfile(u, p);
+          return idx < 0;
+        },
+        addQuizRecord: function (qIndex, correct, detail) {
+          var u = this.getCurrentUser();
+          if (!u) return;
+          var p = getProfile(u);
+          p.quiz.push({ qIndex: qIndex, correct: !!correct, detail: detail || "", t: Date.now() });
+          p.quiz = p.quiz.slice(-200);
+          saveProfile(u, p);
+        }
+      };
+    })();
+
+    /* ========== 路由模块：Hash #/login、#/home ========== */
+    var AppRouter = (function () {
+      function parseRoute() {
+        var h = location.hash || "#/login";
+        if (h.charAt(0) === "#") h = h.slice(1);
+        if (h.charAt(0) !== "/") h = "/" + h;
+        var seg = h.split("/").filter(Boolean);
+        return (seg[0] || "login").toLowerCase();
+      }
+
+      function showView(name) {
+        var elLogin = document.getElementById("spa-login");
+        var elHome = document.getElementById("spa-home");
+        if (!elLogin || !elHome) return;
+        if (name === "home") {
+          elHome.classList.add("is-active");
+          elLogin.classList.remove("is-active");
+          elHome.setAttribute("aria-hidden", "false");
+          elLogin.setAttribute("aria-hidden", "true");
+        } else {
+          elLogin.classList.add("is-active");
+          elHome.classList.remove("is-active");
+          elLogin.setAttribute("aria-hidden", "false");
+          elHome.setAttribute("aria-hidden", "true");
+        }
+      }
+
+      function render() {
+        var user = UserModule.getCurrentUser();
+        var route = parseRoute();
+        if (!user && route === "home") {
+          location.hash = "#/login";
+          return;
+        }
+        if (user && route === "login") {
+          location.hash = "#/home";
+          return;
+        }
+        if (!user) {
+          showView("login");
+          return;
+        }
+        if (route !== "home") {
+          location.hash = "#/home";
+          return;
+        }
+        showView("home");
+        if (typeof refreshUserUi === "function") refreshUserUi();
+      }
+
+      function init() {
+        if (!location.hash || location.hash === "#") {
+          location.hash = UserModule.getCurrentUser() ? "#/home" : "#/login";
+        }
+        window.addEventListener("hashchange", render);
+        render();
+      }
+
+      return { init: init, render: render };
+    })();
+
+    /* ========== 功能模块：DOM 引用与业务 ========== */
+    var searchInput = document.getElementById("searchInput");
+    var searchSuggestPanel = document.getElementById("searchSuggestPanel");
+    var searchBtn = document.getElementById("searchBtn");
+    var resultSection = document.getElementById("resultSection");
+    var quickBtns = document.getElementById("quickBtns");
+    var imageInput = document.getElementById("imageInput");
+    var imageClassifyBtn = document.getElementById("imageClassifyBtn");
+    var imagePreviewWrap = document.getElementById("imagePreviewWrap");
+    var imagePreview = document.getElementById("imagePreview");
+    var imageResultArea = document.getElementById("imageResultArea");
+    var batchInput = document.getElementById("batchInput");
+    var batchSearchBtn = document.getElementById("batchSearchBtn");
+    var batchResultArea = document.getElementById("batchResultArea");
+
+    function escapeHtml(str) {
+      var div = document.createElement("div");
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    var suggestDebounceTimer = null;
+
+    function hideSearchSuggest() {
+      if (!searchSuggestPanel) return;
+      searchSuggestPanel.hidden = true;
+      searchSuggestPanel.innerHTML = "";
+      searchInput.setAttribute("aria-expanded", "false");
+    }
+
+    function updateSearchSuggestPanel() {
+      if (!searchSuggestPanel) return;
+      var q = searchInput.value;
+      var list = collectSuggestions(q);
+      if (!list.length) {
+        hideSearchSuggest();
+        return;
+      }
+      searchSuggestPanel.innerHTML = list.map(function (name) {
+        return '<button type="button" class="search-suggest-item" role="option">' + escapeHtml(name) + "</button>";
+      }).join("");
+      searchSuggestPanel.hidden = false;
+      searchInput.setAttribute("aria-expanded", "true");
+    }
+
+    function scheduleUpdateSearchSuggest() {
+      clearTimeout(suggestDebounceTimer);
+      suggestDebounceTimer = setTimeout(updateSearchSuggestPanel, 90);
+    }
+
+    function renderResult(keyword, categories) {
+      var meta = CATEGORY_META[categories[0]];
+      var list = WASTE_DATA[categories[0]];
+      var name = keyword;
+      for (var i = 0; i < list.length; i++) {
+        if (list[i].toLowerCase() === keyword.toLowerCase()) {
+          name = list[i];
+          break;
+        }
+      }
+      UserModule.addHistory(keyword, categories[0], name);
+      var isFav = UserModule.isFavorite(name);
+      var favClass = isFav ? "fav-btn is-fav fav-toggle-btn" : "fav-btn fav-toggle-btn";
+      var favLabel = isFav ? "已收藏" : "收藏";
+      resultSection.innerHTML =
+        '<div class="result-card ' + categories[0] + '">' +
+        '<div class="result-name">' + escapeHtml(name) + "</div>" +
+        '<div class="result-category" style="color: ' + meta.color + '">' + meta.name + "</div>" +
+        '<div class="result-desc">' + escapeHtml(meta.desc) + "</div>" +
+        '<button type="button" class="' + favClass + '" data-fav-name="' + escapeHtml(name) + '" data-fav-cat="' + escapeHtml(categories[0]) + '">' + escapeHtml(favLabel) + "</button>" +
+        "</div>";
+      if (typeof refreshUserUi === "function") refreshUserUi();
+    }
+
+    function renderNoResult() {
+      var raw = searchInput.value.trim();
+      var typo = /[\u4e00-\u9fff]/.test(raw) ? findTypoSuggestion(raw) : null;
+      var suggestRow = "";
+      if (typo) {
+        suggestRow = '<div class="did-you-mean-box" role="status">' +
+          '<span class="did-you-mean-text">您是不是要找：</span>' +
+          '<button type="button" class="did-you-mean-btn">' + escapeHtml(typo) + "</button></div>";
+      }
+      hideSearchSuggest();
+      resultSection.innerHTML = '<div class="no-result">' +
+        '<div class="icon">🔍</div>' +
+        '<h3>暂未找到「' + escapeHtml(raw) + '」的分类，请尝试其他名称或查看下方指引</h3>' +
+        suggestRow +
+        '<div class="tips-box">' +
+        '<h4>' + escapeHtml(TIPS_TEXT.title) + '</h4>' +
+        '<ul>' + TIPS_TEXT.items.map(function(s) { return '<li>' + escapeHtml(s) + '</li>'; }).join('') + '</ul>' +
+        '</div></div>';
+    }
+
+    function doSearch() {
+      var raw = searchInput.value.trim();
+      hideSearchSuggest();
+      if (!raw) {
+        resultSection.innerHTML = "";
+        return;
+      }
+      var key = raw.toLowerCase();
+      var categories = searchIndex[key] || [];
+      if (categories.length > 0) {
+        renderResult(raw, categories);
+      } else {
+        renderNoResult();
+      }
+    }
+
+    /** 刷新页头昵称、历史与收藏夹展示 */
+    function refreshUserUi() {
+      var u = UserModule.getCurrentUser();
+      var el = document.getElementById("headerUsername");
+      if (el) {
+        el.textContent = u ? "你好，" + u : "";
+        el.setAttribute("title", u || "");
+      }
+      var box = document.getElementById("historyChips");
+      if (box) {
+        box.innerHTML = "";
+        UserModule.getHistory().slice(0, 24).forEach(function (row) {
+          var span = document.createElement("span");
+          span.className = "user-chip";
+          span.textContent = row.displayName || row.keyword;
+          span.addEventListener("click", function () {
+            if (searchInput) searchInput.value = row.keyword;
+            doSearch();
+          });
+          box.appendChild(span);
+        });
+      }
+      var favBox = document.getElementById("favChips");
+      if (favBox) {
+        favBox.innerHTML = "";
+        UserModule.getFavorites().forEach(function (f) {
+          var span = document.createElement("span");
+          span.className = "user-chip";
+          var lab = document.createElement("span");
+          lab.textContent = f.name;
+          var x = document.createElement("button");
+          x.type = "button";
+          x.setAttribute("aria-label", "移除收藏");
+          x.textContent = "×";
+          x.addEventListener("click", function (ev) {
+            ev.stopPropagation();
+            UserModule.toggleFavorite(f.name, f.categoryKey);
+            refreshUserUi();
+          });
+          span.appendChild(lab);
+          span.appendChild(x);
+          span.addEventListener("click", function (ev) {
+            if (ev.target === x) return;
+            if (searchInput) searchInput.value = f.name;
+            doSearch();
+          });
+          favBox.appendChild(span);
+        });
+      }
+    }
+
+    function doBatchSearch() {
+      if (!batchInput || !batchResultArea) return;
+      var text = batchInput.value.trim();
+      if (!text) {
+        batchResultArea.innerHTML = "";
+        return;
+      }
+      var lines = text.split(/[\n\r,，;；、\t]+/).map(function (s) { return s.trim(); }).filter(Boolean);
+      var html = "";
+      lines.forEach(function (line) {
+        var key = line.toLowerCase();
+        var cats = searchIndex[key] || [];
+        if (cats.length > 0) {
+          var meta = CATEGORY_META[cats[0]];
+          html +=
+            '<div class="batch-line result-card ' +
+            cats[0] +
+            '"><strong>' +
+            escapeHtml(line) +
+            '</strong> → <span style="color:' +
+            meta.color +
+            '">' +
+            escapeHtml(meta.name) +
+            "</span></div>";
+          UserModule.addHistory(line, cats[0], line);
+        } else {
+          html +=
+            '<div class="batch-line" style="padding:10px 12px;background:#f8f8f8;border-radius:8px;margin-bottom:8px">' +
+            escapeHtml(line) +
+            ' → <span style="color:#999">库中无精确匹配</span></div>';
+        }
+      });
+      batchResultArea.innerHTML = html;
+      if (typeof refreshUserUi === "function") refreshUserUi();
+    }
+
+    searchBtn.addEventListener("click", doSearch);
+    searchInput.addEventListener("input", scheduleUpdateSearchSuggest);
+    searchInput.addEventListener("keydown", function(e) {
+      if (e.key === "Escape") {
+        hideSearchSuggest();
+        return;
+      }
+      if (e.key === "Enter") doSearch();
+    });
+    searchInput.addEventListener("blur", function () {
+      setTimeout(hideSearchSuggest, 160);
+    });
+
+    if (searchSuggestPanel) {
+      searchSuggestPanel.addEventListener("mousedown", function (e) {
+        var btn = e.target.closest(".search-suggest-item");
+        if (!btn || !searchSuggestPanel.contains(btn)) return;
+        e.preventDefault();
+        var name = btn.textContent.trim();
+        if (name) {
+          searchInput.value = name;
+          hideSearchSuggest();
+          doSearch();
+        }
+      });
+    }
+
+    resultSection.addEventListener("click", function (e) {
+      var fb = e.target.closest(".fav-toggle-btn");
+      if (fb && resultSection.contains(fb)) {
+        e.preventDefault();
+        var nm = fb.getAttribute("data-fav-name");
+        var ck = fb.getAttribute("data-fav-cat");
+        if (nm && ck) {
+          var added = UserModule.toggleFavorite(nm, ck);
+          fb.textContent = added ? "已收藏" : "收藏";
+          fb.className = (added ? "fav-btn is-fav " : "fav-btn ") + "fav-toggle-btn";
+          refreshUserUi();
+        }
+        return;
+      }
+      var b = e.target.closest(".did-you-mean-btn");
+      if (!b || !resultSection.contains(b)) return;
+      e.preventDefault();
+      var t = b.textContent.trim();
+      if (t) {
+        searchInput.value = t;
+        doSearch();
+      }
+    });
+
+    QUICK_ITEMS.forEach(function(name) {
+      var btn = document.createElement("button");
+      btn.className = "quick-btn";
+      btn.textContent = name;
+      btn.addEventListener("click", function() {
+        searchInput.value = name;
+        hideSearchSuggest();
+        doSearch();
+      });
+      quickBtns.appendChild(btn);
+    });
+
+    if (batchSearchBtn) batchSearchBtn.addEventListener("click", doBatchSearch);
+
+    /* ========== 图片识别：纯前端降级（不请求 API）========== */
+    var imageObjectUrl = null;
+
+    function clearImagePreview() {
+      if (imageObjectUrl) {
+        URL.revokeObjectURL(imageObjectUrl);
+        imageObjectUrl = null;
+      }
+      if (imagePreviewWrap) imagePreviewWrap.style.display = "none";
+      if (imagePreview) imagePreview.removeAttribute("src");
+    }
+
+    if (imageInput) {
+      imageInput.addEventListener("change", function() {
+        var f = imageInput.files && imageInput.files[0];
+        if (imageResultArea) imageResultArea.innerHTML = "";
+        clearImagePreview();
+        if (!f || !f.type || f.type.indexOf("image/") !== 0) return;
+        imageObjectUrl = URL.createObjectURL(f);
+        if (imagePreview) imagePreview.src = imageObjectUrl;
+        if (imagePreviewWrap) imagePreviewWrap.style.display = "block";
+      });
+    }
+
+    if (imageClassifyBtn) imageClassifyBtn.addEventListener("click", function () {
+      var f = imageInput.files && imageInput.files[0];
+      if (!f) {
+        alert("请先选择或拍摄一张图片");
+        return;
+      }
+      if (imageResultArea) imageResultArea.innerHTML =
+        '<div class="no-result"><div class="icon">🖼️</div><h3>纯前端模式不可用图像识别</h3>' +
+        '<p class="tips-box" style="margin-top:12px;text-align:left">本页为离线单页应用，未连接任何识别服务。若需 AI 识别，请自行部署后端（如 Node + Python 模型），并在改版中恢复接口调用。</p></div>';
+    });
+
+    /* ========== 页头：滚动收缩样式类 + 移动端汉堡菜单 + 锚点点击后收起 ========== */
+    (function () {
+      var header = document.getElementById("pageHeader");
+      var toggle = document.getElementById("headerNavToggle");
+      var navWrap = document.getElementById("headerNavWrap");
+      var scrollThreshold = 40;
+
+      function updateHeaderScrolled() {
+        if (!header) return;
+        if (window.scrollY > scrollThreshold) {
+          header.classList.add("header--scrolled");
+        } else {
+          header.classList.remove("header--scrolled");
+        }
+      }
+
+      window.addEventListener("scroll", updateHeaderScrolled, { passive: true });
+      updateHeaderScrolled();
+
+      function setNavOpen(open) {
+        if (!toggle || !navWrap) return;
+        toggle.setAttribute("aria-expanded", open ? "true" : "false");
+        navWrap.classList.toggle("is-open", !!open);
+      }
+
+      if (toggle && navWrap) {
+        toggle.addEventListener("click", function () {
+          var open = toggle.getAttribute("aria-expanded") !== "true";
+          setNavOpen(open);
+        });
+      }
+
+      document.querySelectorAll(".header-nav a[data-scroll]").forEach(function (link) {
+        link.addEventListener("click", function (e) {
+          e.preventDefault();
+          if (location.hash !== "#/home") location.hash = "#/home";
+          var sid = link.getAttribute("data-scroll");
+          setTimeout(function () {
+            var t = document.getElementById(sid);
+            if (t) t.scrollIntoView({ behavior: "smooth", block: "start" });
+          }, 100);
+          if (window.matchMedia("(max-width: 767px)").matches) setNavOpen(false);
+        });
+      });
+    })();
+
+    /* ========== 答题小游戏：DOM 渲染与即时判题 ========== */
+    (function () {
+      var mount = document.getElementById("quizMount");
+      if (!mount) return;
+
+      var questions = [
+        {
+          q: "废旧荧光灯管属于哪一类生活垃圾？",
+          opts: ["可回收物", "有害垃圾", "厨余垃圾", "其他垃圾"],
+          ok: 1
+        },
+        {
+          q: "剩饭剩菜主要应投入哪一类？",
+          opts: ["有害垃圾", "其他垃圾", "厨余垃圾", "可回收物"],
+          ok: 2
+        },
+        {
+          q: "污损且难以再生的塑料袋通常归为？",
+          opts: ["可回收物", "厨余垃圾", "有害垃圾", "其他垃圾"],
+          ok: 3
+        }
+      ];
+
+      questions.forEach(function (item, idx) {
+        var block = document.createElement("div");
+        block.className = "quiz-question";
+
+        var title = document.createElement("p");
+        title.textContent = (idx + 1) + ". " + item.q;
+        block.appendChild(title);
+
+        var optsEl = document.createElement("div");
+        optsEl.className = "quiz-options";
+
+        var feedback = document.createElement("div");
+        feedback.className = "quiz-feedback";
+        feedback.setAttribute("aria-live", "polite");
+
+        item.opts.forEach(function (label, optIdx) {
+          var btn = document.createElement("button");
+          btn.type = "button";
+          btn.textContent = label;
+          btn.addEventListener("click", function () {
+            var ok = optIdx === item.ok;
+            if (ok) {
+              feedback.textContent = "回答正确！";
+              feedback.className = "quiz-feedback ok";
+            } else {
+              feedback.textContent = "再想想～正确选项是：「" + item.opts[item.ok] + "」";
+              feedback.className = "quiz-feedback bad";
+            }
+            UserModule.addQuizRecord(idx, ok, item.q);
+          });
+          optsEl.appendChild(btn);
+        });
+
+        block.appendChild(optsEl);
+        block.appendChild(feedback);
+        mount.appendChild(block);
+      });
+    })();
+
+    /* ========== 登录/注册页绑定 ========== */
+    function bindAuthPage() {
+      var tabLogin = document.getElementById("authTabLogin");
+      var tabReg = document.getElementById("authTabRegister");
+      var panelLogin = document.getElementById("panelLogin");
+      var panelReg = document.getElementById("panelRegister");
+      var loginMsg = document.getElementById("loginMsg");
+      var registerMsg = document.getElementById("registerMsg");
+
+      function switchTab(isReg) {
+        if (tabLogin) {
+          tabLogin.classList.toggle("is-on", !isReg);
+          tabLogin.setAttribute("aria-selected", !isReg ? "true" : "false");
+        }
+        if (tabReg) {
+          tabReg.classList.toggle("is-on", isReg);
+          tabReg.setAttribute("aria-selected", isReg ? "true" : "false");
+        }
+        if (panelLogin) panelLogin.classList.toggle("is-on", !isReg);
+        if (panelReg) panelReg.classList.toggle("is-on", isReg);
+      }
+
+      if (tabLogin) tabLogin.addEventListener("click", function () { switchTab(false); });
+      if (tabReg) tabReg.addEventListener("click", function () { switchTab(true); });
+
+      function attemptLogin() {
+        if (!loginMsg) return;
+        loginMsg.textContent = "";
+        loginMsg.className = "auth-msg";
+        var u = (document.getElementById("loginUser") || {}).value.trim();
+        var p = (document.getElementById("loginPass") || {}).value || "";
+        if (!u || !p) {
+          loginMsg.textContent = "请输入账号和密码";
+          return;
+        }
+        var r = UserModule.login(u, p);
+        if (!r.ok) {
+          loginMsg.textContent = r.msg;
+          return;
+        }
+        location.hash = "#/home";
+      }
+
+      var btnLogin = document.getElementById("btnDoLogin");
+      if (btnLogin) btnLogin.addEventListener("click", attemptLogin);
+      var loginPassEl = document.getElementById("loginPass");
+      if (loginPassEl) {
+        loginPassEl.addEventListener("keydown", function (e) {
+          if (e.key === "Enter") attemptLogin();
+        });
+      }
+
+      var btnReg = document.getElementById("btnDoRegister");
+      if (btnReg) {
+        btnReg.addEventListener("click", function () {
+          if (!registerMsg) return;
+          registerMsg.textContent = "";
+          registerMsg.className = "auth-msg";
+          var u = (document.getElementById("regUser") || {}).value.trim();
+          var p1 = (document.getElementById("regPass") || {}).value || "";
+          var p2 = (document.getElementById("regPass2") || {}).value || "";
+          if (!/^[a-zA-Z0-9]{6,20}$/.test(u)) {
+            registerMsg.textContent = "账号需为 6-20 位字母或数字";
+            return;
+          }
+          if (!/^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,20}$/.test(p1)) {
+            registerMsg.textContent = "密码需 8-20 位，且同时包含字母与数字";
+            return;
+          }
+          if (p1 !== p2) {
+            registerMsg.textContent = "两次输入的密码不一致";
+            return;
+          }
+          var regResult = UserModule.register(u, p1);
+          if (!regResult.ok) {
+            registerMsg.textContent = regResult.msg;
+            return;
+          }
+          registerMsg.className = "auth-msg ok";
+          registerMsg.textContent = "注册成功，请登录";
+          switchTab(false);
+        });
+      }
+
+      var btnForgot = document.getElementById("btnForgot");
+      if (btnForgot) {
+        btnForgot.addEventListener("click", function () {
+          alert("本演示站未接入邮箱或人工找回。您可清除浏览器中本站的本地数据后重新注册新账号。");
+        });
+      }
+
+      var btnLogout = document.getElementById("btnLogout");
+      if (btnLogout) {
+        btnLogout.addEventListener("click", function () {
+          UserModule.logout();
+          location.hash = "#/login";
+        });
+      }
+    }
+
+    bindAuthPage();
+    AppRouter.init();
+  </script>
+</body>
+</html>
