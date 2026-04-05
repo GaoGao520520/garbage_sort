@@ -144,6 +144,17 @@
       width: 100%;
     }
 
+    .auth-hint {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: 12px;
+      padding: 10px 12px;
+      background: #f4faf6;
+      border-radius: 8px;
+      border: 1px solid #e0e8e2;
+    }
+
     .auth-msg {
       min-height: 1.4em;
       font-size: 0.85rem;
@@ -153,6 +164,10 @@
 
     .auth-msg.ok {
       color: var(--primary-dark);
+    }
+
+    .auth-form {
+      margin: 0;
     }
 
     .auth-submit {
@@ -1159,33 +1174,38 @@
         <button type="button" class="auth-tab" id="authTabRegister" data-panel="panelRegister" role="tab" aria-selected="false">注册</button>
       </div>
       <div id="panelLogin" class="auth-panel is-on" role="tabpanel">
-        <div class="auth-msg" id="loginMsg"></div>
-        <div class="auth-field">
-          <label for="loginUser">账号</label>
-          <input type="text" class="search-input" id="loginUser" placeholder="6-20 位字母或数字" maxlength="20" autocomplete="username">
-        </div>
-        <div class="auth-field">
-          <label for="loginPass">密码</label>
-          <input type="password" class="search-input" id="loginPass" placeholder="请输入密码" maxlength="20" autocomplete="current-password">
-        </div>
-        <button type="button" class="search-btn auth-submit" id="btnDoLogin">登录</button>
+        <p class="auth-hint">数据仅存本浏览器。线上地址与电脑本地<strong>不共用</strong>账号，请在本页「注册」后再登录。</p>
+        <form id="formLogin" class="auth-form" action="#" method="post" novalidate>
+          <div class="auth-msg" id="loginMsg"></div>
+          <div class="auth-field">
+            <label for="loginUser">账号</label>
+            <input type="text" class="search-input" id="loginUser" name="username" placeholder="6-20 位字母或数字" maxlength="20" autocomplete="username">
+          </div>
+          <div class="auth-field">
+            <label for="loginPass">密码</label>
+            <input type="password" class="search-input" id="loginPass" name="password" placeholder="请输入密码" maxlength="20" autocomplete="current-password">
+          </div>
+          <button type="submit" class="search-btn auth-submit" id="btnDoLogin">登录</button>
+        </form>
         <button type="button" class="auth-forgot" id="btnForgot">忘记密码？</button>
       </div>
       <div id="panelRegister" class="auth-panel" role="tabpanel">
-        <div class="auth-msg" id="registerMsg"></div>
-        <div class="auth-field">
-          <label for="regUser">账号</label>
-          <input type="text" class="search-input" id="regUser" placeholder="6-20 位字母或数字" maxlength="20" autocomplete="off">
-        </div>
-        <div class="auth-field">
-          <label for="regPass">密码（8-20 位，含字母+数字）</label>
-          <input type="password" class="search-input" id="regPass" placeholder="设置密码" maxlength="20" autocomplete="new-password">
-        </div>
-        <div class="auth-field">
-          <label for="regPass2">确认密码</label>
-          <input type="password" class="search-input" id="regPass2" placeholder="再次输入密码" maxlength="20" autocomplete="new-password">
-        </div>
-        <button type="button" class="search-btn auth-submit" id="btnDoRegister">注册</button>
+        <form id="formRegister" class="auth-form" action="#" method="post" novalidate>
+          <div class="auth-msg" id="registerMsg"></div>
+          <div class="auth-field">
+            <label for="regUser">账号</label>
+            <input type="text" class="search-input" id="regUser" name="regusername" placeholder="6-20 位字母或数字" maxlength="20" autocomplete="off">
+          </div>
+          <div class="auth-field">
+            <label for="regPass">密码（8-20 位，含字母+数字）</label>
+            <input type="password" class="search-input" id="regPass" name="regpassword" placeholder="设置密码" maxlength="20" autocomplete="new-password">
+          </div>
+          <div class="auth-field">
+            <label for="regPass2">确认密码</label>
+            <input type="password" class="search-input" id="regPass2" name="regpassword2" placeholder="再次输入密码" maxlength="20" autocomplete="new-password">
+          </div>
+          <button type="submit" class="search-btn auth-submit" id="btnDoRegister">注册</button>
+        </form>
       </div>
     </div>
   </div>
@@ -1597,8 +1617,14 @@
         localStorage.setItem(profileKey(username), JSON.stringify(p));
       }
 
+      /** 账号统一小写，避免注册 Gaoshuo 与登录 gaoshuo 不一致 */
+      function normalizeUsername(u) {
+        return String(u || "").trim().toLowerCase();
+      }
+
       return {
         encodePassword: encodePassword,
+        normalizeUsername: normalizeUsername,
         getCurrentUser: function () {
           try {
             var s = JSON.parse(localStorage.getItem(KEY_SESSION) || "null");
@@ -1608,24 +1634,32 @@
           }
         },
         setSession: function (username) {
-          localStorage.setItem(KEY_SESSION, JSON.stringify({ username: username, at: Date.now() }));
+          localStorage.setItem(KEY_SESSION, JSON.stringify({ username: normalizeUsername(username), at: Date.now() }));
         },
         clearSession: function () {
           localStorage.removeItem(KEY_SESSION);
         },
         register: function (username, password) {
+          var un = normalizeUsername(username);
+          if (!un) return { ok: false, msg: "请输入账号" };
           var reg = getRegistry();
-          if (reg[username]) return { ok: false, msg: "该账号已被注册" };
-          reg[username] = { passwordB64: encodePassword(password) };
+          if (reg[un]) return { ok: false, msg: "该账号已被注册" };
+          reg[un] = { passwordB64: encodePassword(password) };
           saveRegistry(reg);
-          saveProfile(username, getProfile(username));
+          saveProfile(un, getProfile(un));
           return { ok: true };
         },
         login: function (username, password) {
+          var un = normalizeUsername(username);
           var reg = getRegistry();
-          if (!reg[username]) return { ok: false, msg: "账号不存在" };
-          if (reg[username].passwordB64 !== encodePassword(password)) return { ok: false, msg: "密码错误" };
-          this.setSession(username);
+          if (!reg[un]) {
+            return {
+              ok: false,
+              msg: "账号不存在。若刚部署到网上，请在「本网页」先注册；本地注册的账号不会同步到线上。"
+            };
+          }
+          if (reg[un].passwordB64 !== encodePassword(password)) return { ok: false, msg: "密码错误" };
+          this.setSession(un);
           return { ok: true };
         },
         logout: function () {
@@ -1695,12 +1729,16 @@
         var elLogin = document.getElementById("spa-login");
         var elHome = document.getElementById("spa-home");
         if (!elLogin || !elHome) return;
+        var ae = document.activeElement;
         if (name === "home") {
+          /* 避免焦点留在即将 aria-hidden 的登录层，消除控制台黄条警告 */
+          if (ae && elLogin.contains(ae)) ae.blur();
           elHome.classList.add("is-active");
           elLogin.classList.remove("is-active");
           elHome.setAttribute("aria-hidden", "false");
           elLogin.setAttribute("aria-hidden", "true");
         } else {
+          if (ae && elHome.contains(ae)) ae.blur();
           elLogin.classList.add("is-active");
           elHome.classList.remove("is-active");
           elLogin.setAttribute("aria-hidden", "false");
@@ -1711,16 +1749,19 @@
       function render() {
         var user = UserModule.getCurrentUser();
         var route = parseRoute();
-        if (!user && route === "home") {
-          location.hash = "#/login";
+        /* 未登录时地址栏一律改为 #/login，避免 #/home 仍显示登录页的困惑 */
+        if (!user) {
+          if (route !== "login") {
+            /* 先同步视图再改 hash，避免「看得见登录层但 aria-hidden=true」导致点击异常 */
+            showView("login");
+            location.hash = "#/login";
+            return;
+          }
+          showView("login");
           return;
         }
         if (user && route === "login") {
           location.hash = "#/home";
-          return;
-        }
-        if (!user) {
-          showView("login");
           return;
         }
         if (route !== "home") {
@@ -2153,8 +2194,6 @@
       var tabReg = document.getElementById("authTabRegister");
       var panelLogin = document.getElementById("panelLogin");
       var panelReg = document.getElementById("panelRegister");
-      var loginMsg = document.getElementById("loginMsg");
-      var registerMsg = document.getElementById("registerMsg");
 
       function switchTab(isReg) {
         if (tabLogin) {
@@ -2172,61 +2211,85 @@
       if (tabLogin) tabLogin.addEventListener("click", function () { switchTab(false); });
       if (tabReg) tabReg.addEventListener("click", function () { switchTab(true); });
 
+      function showLoginError(text) {
+        var msgEl = document.getElementById("loginMsg");
+        if (msgEl) {
+          msgEl.textContent = text;
+          msgEl.className = "auth-msg";
+        } else {
+          alert(text);
+        }
+      }
+
       function attemptLogin() {
-        if (!loginMsg) return;
-        loginMsg.textContent = "";
-        loginMsg.className = "auth-msg";
-        var u = (document.getElementById("loginUser") || {}).value.trim();
-        var p = (document.getElementById("loginPass") || {}).value || "";
-        if (!u || !p) {
-          loginMsg.textContent = "请输入账号和密码";
-          return;
+        try {
+          var msgEl = document.getElementById("loginMsg");
+          if (msgEl) {
+            msgEl.textContent = "";
+            msgEl.className = "auth-msg";
+          }
+          var uEl = document.getElementById("loginUser");
+          var pEl = document.getElementById("loginPass");
+          var u = uEl ? String(uEl.value).trim() : "";
+          var p = pEl ? String(pEl.value || "") : "";
+          if (!u || !p) {
+            showLoginError("请输入账号和密码");
+            return;
+          }
+          var r = UserModule.login(u, p);
+          if (!r.ok) {
+            showLoginError(r.msg || "登录失败");
+            return;
+          }
+          location.hash = "#/home";
+        } catch (err) {
+          showLoginError("脚本异常：" + (err && err.message ? err.message : String(err)) + "（请尝试强制刷新页面）");
         }
-        var r = UserModule.login(u, p);
-        if (!r.ok) {
-          loginMsg.textContent = r.msg;
-          return;
-        }
-        location.hash = "#/home";
       }
 
-      var btnLogin = document.getElementById("btnDoLogin");
-      if (btnLogin) btnLogin.addEventListener("click", attemptLogin);
-      var loginPassEl = document.getElementById("loginPass");
-      if (loginPassEl) {
-        loginPassEl.addEventListener("keydown", function (e) {
-          if (e.key === "Enter") attemptLogin();
+      var formLogin = document.getElementById("formLogin");
+      if (formLogin) {
+        formLogin.addEventListener("submit", function (e) {
+          e.preventDefault();
+          attemptLogin();
         });
+      } else {
+        console.error("未找到 #formLogin");
       }
 
-      var btnReg = document.getElementById("btnDoRegister");
-      if (btnReg) {
-        btnReg.addEventListener("click", function () {
-          if (!registerMsg) return;
-          registerMsg.textContent = "";
-          registerMsg.className = "auth-msg";
-          var u = (document.getElementById("regUser") || {}).value.trim();
-          var p1 = (document.getElementById("regPass") || {}).value || "";
-          var p2 = (document.getElementById("regPass2") || {}).value || "";
+      var formRegister = document.getElementById("formRegister");
+      if (formRegister) {
+        formRegister.addEventListener("submit", function (e) {
+          e.preventDefault();
+          var regEl = document.getElementById("registerMsg");
+          if (!regEl) return;
+          regEl.textContent = "";
+          regEl.className = "auth-msg";
+          var ru = document.getElementById("regUser");
+          var rp1 = document.getElementById("regPass");
+          var rp2 = document.getElementById("regPass2");
+          var u = ru ? String(ru.value).trim() : "";
+          var p1 = rp1 ? String(rp1.value || "") : "";
+          var p2 = rp2 ? String(rp2.value || "") : "";
           if (!/^[a-zA-Z0-9]{6,20}$/.test(u)) {
-            registerMsg.textContent = "账号需为 6-20 位字母或数字";
+            regEl.textContent = "账号需为 6-20 位字母或数字";
             return;
           }
           if (!/^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,20}$/.test(p1)) {
-            registerMsg.textContent = "密码需 8-20 位，且同时包含字母与数字";
+            regEl.textContent = "密码需 8-20 位，且同时包含字母与数字";
             return;
           }
           if (p1 !== p2) {
-            registerMsg.textContent = "两次输入的密码不一致";
+            regEl.textContent = "两次输入的密码不一致";
             return;
           }
           var regResult = UserModule.register(u, p1);
           if (!regResult.ok) {
-            registerMsg.textContent = regResult.msg;
+            regEl.textContent = regResult.msg;
             return;
           }
-          registerMsg.className = "auth-msg ok";
-          registerMsg.textContent = "注册成功，请登录";
+          regEl.className = "auth-msg ok";
+          regEl.textContent = "注册成功，请登录";
           switchTab(false);
         });
       }
