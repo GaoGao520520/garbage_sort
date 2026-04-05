@@ -1783,6 +1783,10 @@
       return { init: init, render: render };
     })();
 
+    /* 先绑定登录与路由，再绑定首页搜索等；避免前面任一步抛错导致「登录按钮永远没监听」 */
+    bindAuthPage();
+    AppRouter.init();
+
     /* ========== 功能模块：DOM 引用与业务 ========== */
     var searchInput = document.getElementById("searchInput");
     var searchSuggestPanel = document.getElementById("searchSuggestPanel");
@@ -1810,11 +1814,11 @@
       if (!searchSuggestPanel) return;
       searchSuggestPanel.hidden = true;
       searchSuggestPanel.innerHTML = "";
-      searchInput.setAttribute("aria-expanded", "false");
+      if (searchInput) searchInput.setAttribute("aria-expanded", "false");
     }
 
     function updateSearchSuggestPanel() {
-      if (!searchSuggestPanel) return;
+      if (!searchSuggestPanel || !searchInput) return;
       var q = searchInput.value;
       var list = collectSuggestions(q);
       if (!list.length) {
@@ -1834,6 +1838,7 @@
     }
 
     function renderResult(keyword, categories) {
+      if (!resultSection) return;
       var meta = CATEGORY_META[categories[0]];
       var list = WASTE_DATA[categories[0]];
       var name = keyword;
@@ -1858,6 +1863,7 @@
     }
 
     function renderNoResult() {
+      if (!resultSection || !searchInput) return;
       var raw = searchInput.value.trim();
       var typo = /[\u4e00-\u9fff]/.test(raw) ? findTypoSuggestion(raw) : null;
       var suggestRow = "";
@@ -1878,6 +1884,7 @@
     }
 
     function doSearch() {
+      if (!searchInput || !resultSection) return;
       var raw = searchInput.value.trim();
       hideSearchSuggest();
       if (!raw) {
@@ -1980,34 +1987,36 @@
       if (typeof refreshUserUi === "function") refreshUserUi();
     }
 
-    searchBtn.addEventListener("click", doSearch);
-    searchInput.addEventListener("input", scheduleUpdateSearchSuggest);
-    searchInput.addEventListener("keydown", function(e) {
-      if (e.key === "Escape") {
-        hideSearchSuggest();
-        return;
-      }
-      if (e.key === "Enter") doSearch();
-    });
-    searchInput.addEventListener("blur", function () {
-      setTimeout(hideSearchSuggest, 160);
-    });
-
-    if (searchSuggestPanel) {
-      searchSuggestPanel.addEventListener("mousedown", function (e) {
-        var btn = e.target.closest(".search-suggest-item");
-        if (!btn || !searchSuggestPanel.contains(btn)) return;
-        e.preventDefault();
-        var name = btn.textContent.trim();
-        if (name) {
-          searchInput.value = name;
+    /* 缺任意首页关键节点时不应抛错，否则后面的登录绑定永远不会执行 */
+    if (searchBtn && searchInput && resultSection && quickBtns) {
+      searchBtn.addEventListener("click", doSearch);
+      searchInput.addEventListener("input", scheduleUpdateSearchSuggest);
+      searchInput.addEventListener("keydown", function(e) {
+        if (e.key === "Escape") {
           hideSearchSuggest();
-          doSearch();
+          return;
         }
+        if (e.key === "Enter") doSearch();
       });
-    }
+      searchInput.addEventListener("blur", function () {
+        setTimeout(hideSearchSuggest, 160);
+      });
 
-    resultSection.addEventListener("click", function (e) {
+      if (searchSuggestPanel) {
+        searchSuggestPanel.addEventListener("mousedown", function (e) {
+          var btn = e.target.closest(".search-suggest-item");
+          if (!btn || !searchSuggestPanel.contains(btn)) return;
+          e.preventDefault();
+          var name = btn.textContent.trim();
+          if (name) {
+            searchInput.value = name;
+            hideSearchSuggest();
+            doSearch();
+          }
+        });
+      }
+
+      resultSection.addEventListener("click", function (e) {
       var fb = e.target.closest(".fav-toggle-btn");
       if (fb && resultSection.contains(fb)) {
         e.preventDefault();
@@ -2031,17 +2040,20 @@
       }
     });
 
-    QUICK_ITEMS.forEach(function(name) {
-      var btn = document.createElement("button");
-      btn.className = "quick-btn";
-      btn.textContent = name;
-      btn.addEventListener("click", function() {
-        searchInput.value = name;
-        hideSearchSuggest();
-        doSearch();
+      QUICK_ITEMS.forEach(function(name) {
+        var btn = document.createElement("button");
+        btn.className = "quick-btn";
+        btn.textContent = name;
+        btn.addEventListener("click", function() {
+          searchInput.value = name;
+          hideSearchSuggest();
+          doSearch();
+        });
+        quickBtns.appendChild(btn);
       });
-      quickBtns.appendChild(btn);
-    });
+    } else {
+      console.error("首页搜索区 DOM 不完整（searchBtn/searchInput/resultSection/quickBtns），已跳过绑定，请检查 HTML");
+    }
 
     if (batchSearchBtn) batchSearchBtn.addEventListener("click", doBatchSearch);
 
@@ -2309,9 +2321,6 @@
         });
       }
     }
-
-    bindAuthPage();
-    AppRouter.init();
   </script>
 </body>
 </html>
