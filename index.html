@@ -2073,8 +2073,9 @@
     /* ========== 图片识别：PyTorch→ONNX（与训练脚本一致）/ 可选 TF.js / 否则 MobileNet ========== */
     var GC_ORT_VERSION = "1.21.0";
     var GC_CUSTOM_IMAGE_MODEL = {
-      /** 与导出脚本 classes.txt 顺序一致：0=hazardous, 1=kitchen, 2=other, 3=recyclable；ONNX 在仓库根目录时为文件名即可 */
-      onnxModelUrl: "garbage_mobilenetv3.onnx",
+      /** 与 classes.txt 顺序一致：0=hazardous, 1=kitchen, 2=other, 3=recyclable。
+       * 国内若 raw.githubusercontent.com / github.io 打不开，可用 jsDelivr 镜像（仓库须公开且文件已 push 到 main）： */
+      onnxModelUrl: "https://cdn.jsdelivr.net/gh/GaoGao520520/garbage_sort@main/garbage_mobilenetv3.onnx",
       onnxInputName: "input",
       onnxOutputName: "logits",
       modelJsonUrl: null,
