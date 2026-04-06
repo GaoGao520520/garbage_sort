@@ -57,12 +57,16 @@
       animation: fadeIn 0.35s ease-out;
     }
 
-    /* ========== 登录/注册页 ========== */
-    .auth-page {
-      min-height: 100vh;
+    /* 登录层无 .is-active 时必须隐藏：单独写 .auth-page{display:flex} 会覆盖 .spa-view{display:none}，导致已登录仍叠在首页上 */
+    .spa-view.auth-page.is-active {
       display: flex;
       align-items: center;
       justify-content: center;
+    }
+
+    /* ========== 登录/注册页 ========== */
+    .auth-page {
+      min-height: 100vh;
       padding: 24px 16px;
       background: linear-gradient(135deg, #145a3a 0%, var(--primary-dark) 28%, var(--primary) 62%, #6bc49a 100%);
     }
