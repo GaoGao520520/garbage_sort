@@ -1291,10 +1291,6 @@
     <!-- 图片识别区（浏览器端轻量模型，部署到 https 后首次识别需联网加载模型） -->
     <section class="image-section" id="section-image">
       <h2>📷 拍照 / 选图识别</h2>
-      <p class="sub">将本页部署到 <strong>GitHub Pages</strong> 等静态空间即可获得<strong>固定网址</strong>访问；登录与主功能通过路由 <code>#/login</code> / <code>#/home</code> 分为两块。图像识别可在脚本中配置<strong>自训练 TensorFlow.js 模型</strong>（<code>model.json</code>）；未配置时使用内置 MobileNet 作参考推断。</p>
-      <div class="image-offline-tip">
-        <strong>说明：</strong>若使用 <strong>PyTorch 训练的权重</strong>，请在本机运行 <code>export_pytorch_to_onnx_for_web.py</code> 生成 <code>garbage_mobilenetv3.onnx</code>，上传到仓库（如 <code>models/</code>），并在脚本中配置 <code>GC_CUSTOM_IMAGE_MODEL.onnxModelUrl</code> 与 <code>classKeys</code>（顺序与 <code>classes.txt</code> 一致）。亦可选用 TensorFlow.js 的 <code>modelJsonUrl</code>。
-      </div>
       <div class="image-row">
         <input type="file" id="imageInput" accept="image/*" capture="environment" />
         <button type="button" class="image-btn" id="imageClassifyBtn">开始识别</button>
@@ -2410,7 +2406,7 @@
       }).join("；");
       var mid =
         resultMode === "custom"
-          ? "自训练模型（TensorFlow.js，浏览器端）"
+          ? "自训练模型（ONNX，浏览器端）"
           : "浏览器端模型（仅供参考）";
       var probLabel = resultMode === "custom" ? "各类置信度：" : "ImageNet 前三匹配：";
       var foot =
